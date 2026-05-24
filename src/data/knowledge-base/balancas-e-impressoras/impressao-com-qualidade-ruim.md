@@ -1,0 +1,22 @@
+---
+title: "Impressão com qualidade ruim"
+category: "Balancas E Impressoras"
+source: "https://www.notion.so/Impress-o-com-qualidade-ruim-24300ee50e9081509de8fa9a9cc32569"
+scraped_at: "2026-05-22T10:50:28.207Z"
+---
+
+# Impressão com qualidade ruim
+
+Caso o cliente informe que a impressão está saindo com a qualidade ruim, verifique se a impressora está no modo rascunho através do processo abaixo:
+
+1. Em Dispositivos e Impressoras, clique com o botão direito na impressora e clique em Preferências de impressão;
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/c731ae6b-e897-4970-afe6-e45e105d01c3/dar1.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466SZXRFNXT%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T105024Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJIMEYCIQCFXtnmpquymIyXfjWBkMqsePuN1Vk7JQ41kJn8JG0uMQIhAKowGWs95Hdd6mPgg1X2LmDM5WBAX%2FmC1%2Fcg6FYTEVjHKv8DCBoQABoMNjM3NDIzMTgzODA1IgzwIjZRCPgTfmJRf%2Bwq3APxPRkdGZiJHcb4eKVdIgjMyfhvl9%2BisPe6C9OWO23ehlGTnikhHGei6R6lJ4QcaLuCZrGBJ%2FZphZV0oiijiekqxhjJacJZ1RN1%2FBcSg9Mk%2BfQOCXA9DHviy3TForu8bR%2Bgl7m2w5yAStGGnXJGx7PYIoY%2BBuGC0UHkyajgwddx4IZkltV0BhtejMonRWsGkHbnheX8xNko%2B4p%2BHjZ8FOqiY4g8x9HPSSaAod7zxx0DidsOgarx8OG8y4%2BezXnl0%2BzBZHsTo7boYRa9sZpCY7wI7yNMZNn%2Fb%2BU3r3w3XPM2v0B1mcmLtjYnUJ7xu8xwcGRfAvcjrzvTvEVvdHJNbMloUZpUv2EALCiXMCwmfmEKaw8Ya99bMEmRDV5tAHkUDgw0x7Qrya%2FWrC7IwWiBAt9Rp41wJEFOOlcOuVFv7vjgo5IAQov1fRq2agRHUJ%2FmiQyIC9OcBwddED8jdEbitr9OwdxJNSxLY22uJGLGZ%2BnUSycMACfF2xy7J90Cl6N%2FP4Z8P8KyRzegN554Mifbb4mk06pPJ2Txmlti0wKdIWurFe1gM449w0gD%2BYSp2jbZAK1REl8%2FJpiks3VYNwYOQ9YAibQXJWmIv9JDLl1UB0WGJpg3KgxX3IwQiWHsxTDGwMDQBjqkAZfvUnCC%2BESzn%2BIWCDb7L9NLcRT362H2kaHh5u2EtBMU8lzbyRr2KzhAYl7We1wWPdxNjDGZJQ0uWE0HJG902P6S%2Fl77LK9AaE%2BNJqVEvFBmYj0e0fL9YdjOnk9WMWO%2B8XaS7b7c7B4mNStsAxk6nm8GKJeWdAXwnV8j9CmQb%2FYbz556jdjR%2BlsGnc8W5uak3lIbNqGmGO0dYim8WnAyx5hgd6Hy&X-Amz-Signature=bbce6de6c23de0f35eba40bf1aa487d4d193255ba30f9a34556b8018b63b820c&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+1. Agora clique em Avançado > Qualidade de Impressão > Normal e dê um OK;
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/c151b731-bd73-4569-bb2c-efb29ad5a1b8/2dar.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466WYKQ53X6%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T105026Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJIMEYCIQDvIahXVVmoVquRHlxDTN3LovFR9SHxX5CkxAyiJ2nl9AIhAL9iMe%2FGNCx4ag7aN4Y4Wl4I0lawgAGgeqRZ0JVoTffqKv8DCBoQABoMNjM3NDIzMTgzODA1Igx9U3%2B2GUkzRMO5Y9cq3AOzWKlYp76wLvzYBHbmlYROMt0BFrUqzRORex%2F3AUKEZXOw6LUHHd3%2BTyJqhk5n5HQqys%2B0qiho7DAZM%2B5ejYvFlGm%2BUXkRqXO6ICDTBqav35ZQ5dxiBUEr2vGgHCIbXtC6Y8wVpnBseIAQxhM9fSkeMNTSMZH7QFdlJZlwY2Vs%2BSyD2ukWOjTS61hyrxKM%2BjTIKVMYQPPnqBXxAnOVL8tlvhYGZa%2BVnpofX8bXuyRXPLbjeQifALELlzzpoxH05f%2FB1WxPOBHpn5dXLTZgm%2FUargjsx0mgLHMBdOV%2FH78pBt4Klrd%2Bu%2Fwu2kGXYjlAC0jG3RsBKqq2HvZ9SfvM%2FXBvAwx89S4u1Rgy%2BW8AQ75tOJZRNXR7CKnGpY8d1BhDsgJYHpqJ%2FcahTCoM%2BStiu9x3jXNyl3bufKXLfUnAvPGMzeieoPLl9orAcbJv0ETKWO5ZusFkTEq0MTZAUaBUnQj%2FN6TzSnNWEIo%2FyRt4tG5qN3geq27mrUuS9yAWgMeFp6BtYgocBQyWkS838noPRDS2V8gDDY%2B2S%2B7yBVGGInLkJNR3LZwzpm3%2FErA5YcyjNcq9kW7tjUz2WREPdMylTWlhhKye2s%2F%2FQDi6CskXgIaD9rPOK41sAFyGsIE9ejCvwMDQBjqkAQV4%2BA6QG97%2B4%2FRW9BbpNqHvac3AaXry3L4%2B64jdVBw2vQiVc4SSgBWddkrdbp%2FILmNeU%2FWdJ2n0EBAEPwntIi3KAsaTXyiOHpz1xixAiunPAQZhMznIXOBFnYRKRaczP3PFF5toZfHU6kgVxmzWal3C5MQJlf1Jt%2B7hnUcEMV%2BjvN3lOJo0iAZWBmLTjNDIGSINC5rNYGyHdnBG2B%2Bykh%2FCz0JF&X-Amz-Signature=d1fd83e4ac3986176c6b1cc0981dbfece8481fc088d2569d4feb58471f1a8904&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+1. Por fim, teste uma impressão novamente para verificar como está saindo agora.
+
+
+## 📝 Tag para finalizar o chat

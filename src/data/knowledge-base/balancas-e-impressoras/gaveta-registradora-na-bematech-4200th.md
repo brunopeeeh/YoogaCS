@@ -1,0 +1,33 @@
+---
+title: "Gaveta registradora na Bematech 4200th"
+category: "Balancas E Impressoras"
+source: "https://www.notion.so/Gaveta-registradora-na-Bematech-4200th-24300ee50e90815e89ccdc2b2185d032"
+scraped_at: "2026-05-22T10:48:47.504Z"
+---
+
+# Gaveta registradora na Bematech 4200th
+
+## _Tópicos_
+
+[_Como configurar_](/24300ee50e90815e89ccdc2b2185d032)
+
+[_Tag para finalizar o chat_](/24300ee50e90815e89ccdc2b2185d032)
+
+---
+
+## 😎Como configurar
+
+Pressiona **Windows + R **para abrir a tela de executar, digite **control printers **e pressione OK.
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/a07a4fa0-cbe1-4985-844b-16c31fd76366/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB4666GC56CPC%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T104846Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIAgK%2FKcAKd%2FhmBOolRTF8H%2BOxDPFc53WxoxKvc9rj9L0AiEAhoVWS5EyQZxaZ75gIFESd3zKCsA0sBFT8c2zoflHwnEq%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDKu%2F75hnpUVPwbF3PircAzqnd9A3oldlnVWG2t7%2BJPWN1CnM1aeiDynbYKhN%2B%2FTanYYIuRNBI7NIEBoWY2gKLe19dMvJ9M5doLhIVsRcSphj74lnGQG%2FeEej953blY0sq4h71Cj6RNfzhOZa%2ByN7JUaO%2BAbgW9UQ8%2BGRlAlfcGRhWDVHB7mHsUk0UhnI6Wl4OSwSAoubIb3upKQVIeQshD2pwYycHL6SlMiFnxcf2DgnfouEvAcijhMXnWnAG07hVtk13yD2kPa07TRCnGr3qEC%2FHSQnmn3%2BZaAj%2BN%2BybO%2BTBA0tc5xWFj3mALIiFUBMV92SfGKXK4L4MoD4tO0shyBE634hK1JMz1PwRyIOhjM3V4H8PUnqsuFiJFwwj3EkBAYvdvsBBLfWn%2FxiN7Dl56DGgAU9q%2Bx9g1N77QEQGAYiZHSPgqL4FjHPPhLyxQJ9fCTLofnfbZqxci9ANsazAvlHXi7coOrWLaRJjThaKsRcQ60YdB3%2FDGiuCsVn25RN%2BbRZEZdacIVSJidtBeeLjy%2FNLryIsJ2RmuCsbUaBR23M4x6dw0q%2FWxEUFPRnEW8DhEZSglRHRDkXeaZsB3kltiZAG2%2F%2BxSkOHFmocwq%2FsyMUsUcRqjwJpQUfeUGkyICAD6eBhA3Zj%2BoBAJ62MJbAwNAGOqUBptrqHV73abh4LxiG1Q%2Bl8xba50uXnhlVp7yulIaqAMujSv7Jctp0VxTFAw39nTHUNBtUjcEvaQOkAfC3glIHKeBqKiPfw2AKkanluMwjxWbf%2Bo0dBu3C8PvAbCkVuQn%2FK%2FIxmBc7AQjSr6k7xDMdhTBZCKFA%2FSk3ZI2ER4HXctPJIyNlFKpgRfUOQT17KgJIUkMClWpl1v%2BrdsXP1eHh%2BwxjbrWY&X-Amz-Signature=760648836195b927a58d83022bfe275bdf154a08852fe161e81b617892b5bbb6&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Por aqui clique com o botão direito sobre a impressora bematech 4200th e selecione **propriedades da impressora.
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/a81802fe-b2c2-4729-9fc4-1b4e84fdb35d/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB4666GC56CPC%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T104846Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIAgK%2FKcAKd%2FhmBOolRTF8H%2BOxDPFc53WxoxKvc9rj9L0AiEAhoVWS5EyQZxaZ75gIFESd3zKCsA0sBFT8c2zoflHwnEq%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDKu%2F75hnpUVPwbF3PircAzqnd9A3oldlnVWG2t7%2BJPWN1CnM1aeiDynbYKhN%2B%2FTanYYIuRNBI7NIEBoWY2gKLe19dMvJ9M5doLhIVsRcSphj74lnGQG%2FeEej953blY0sq4h71Cj6RNfzhOZa%2ByN7JUaO%2BAbgW9UQ8%2BGRlAlfcGRhWDVHB7mHsUk0UhnI6Wl4OSwSAoubIb3upKQVIeQshD2pwYycHL6SlMiFnxcf2DgnfouEvAcijhMXnWnAG07hVtk13yD2kPa07TRCnGr3qEC%2FHSQnmn3%2BZaAj%2BN%2BybO%2BTBA0tc5xWFj3mALIiFUBMV92SfGKXK4L4MoD4tO0shyBE634hK1JMz1PwRyIOhjM3V4H8PUnqsuFiJFwwj3EkBAYvdvsBBLfWn%2FxiN7Dl56DGgAU9q%2Bx9g1N77QEQGAYiZHSPgqL4FjHPPhLyxQJ9fCTLofnfbZqxci9ANsazAvlHXi7coOrWLaRJjThaKsRcQ60YdB3%2FDGiuCsVn25RN%2BbRZEZdacIVSJidtBeeLjy%2FNLryIsJ2RmuCsbUaBR23M4x6dw0q%2FWxEUFPRnEW8DhEZSglRHRDkXeaZsB3kltiZAG2%2F%2BxSkOHFmocwq%2FsyMUsUcRqjwJpQUfeUGkyICAD6eBhA3Zj%2BoBAJ62MJbAwNAGOqUBptrqHV73abh4LxiG1Q%2Bl8xba50uXnhlVp7yulIaqAMujSv7Jctp0VxTFAw39nTHUNBtUjcEvaQOkAfC3glIHKeBqKiPfw2AKkanluMwjxWbf%2Bo0dBu3C8PvAbCkVuQn%2FK%2FIxmBc7AQjSr6k7xDMdhTBZCKFA%2FSk3ZI2ER4HXctPJIyNlFKpgRfUOQT17KgJIUkMClWpl1v%2BrdsXP1eHh%2BwxjbrWY&X-Amz-Signature=8a26b49bf223ca99a0f1f0634322b73c89fc7c54e26ae3b16d5eb3fb28433633&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Agora selecione **configurações do Dispositivo ** e na opção **Abrir gaveta de dinheiro **seleciona a opção **Depois da impressão, **a configuração deve ser feita nas duas opções de abertura de gaveta.
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/c5172b70-1961-4527-9f0c-99c1e01bdddc/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB4666GC56CPC%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T104846Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIAgK%2FKcAKd%2FhmBOolRTF8H%2BOxDPFc53WxoxKvc9rj9L0AiEAhoVWS5EyQZxaZ75gIFESd3zKCsA0sBFT8c2zoflHwnEq%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDKu%2F75hnpUVPwbF3PircAzqnd9A3oldlnVWG2t7%2BJPWN1CnM1aeiDynbYKhN%2B%2FTanYYIuRNBI7NIEBoWY2gKLe19dMvJ9M5doLhIVsRcSphj74lnGQG%2FeEej953blY0sq4h71Cj6RNfzhOZa%2ByN7JUaO%2BAbgW9UQ8%2BGRlAlfcGRhWDVHB7mHsUk0UhnI6Wl4OSwSAoubIb3upKQVIeQshD2pwYycHL6SlMiFnxcf2DgnfouEvAcijhMXnWnAG07hVtk13yD2kPa07TRCnGr3qEC%2FHSQnmn3%2BZaAj%2BN%2BybO%2BTBA0tc5xWFj3mALIiFUBMV92SfGKXK4L4MoD4tO0shyBE634hK1JMz1PwRyIOhjM3V4H8PUnqsuFiJFwwj3EkBAYvdvsBBLfWn%2FxiN7Dl56DGgAU9q%2Bx9g1N77QEQGAYiZHSPgqL4FjHPPhLyxQJ9fCTLofnfbZqxci9ANsazAvlHXi7coOrWLaRJjThaKsRcQ60YdB3%2FDGiuCsVn25RN%2BbRZEZdacIVSJidtBeeLjy%2FNLryIsJ2RmuCsbUaBR23M4x6dw0q%2FWxEUFPRnEW8DhEZSglRHRDkXeaZsB3kltiZAG2%2F%2BxSkOHFmocwq%2FsyMUsUcRqjwJpQUfeUGkyICAD6eBhA3Zj%2BoBAJ62MJbAwNAGOqUBptrqHV73abh4LxiG1Q%2Bl8xba50uXnhlVp7yulIaqAMujSv7Jctp0VxTFAw39nTHUNBtUjcEvaQOkAfC3glIHKeBqKiPfw2AKkanluMwjxWbf%2Bo0dBu3C8PvAbCkVuQn%2FK%2FIxmBc7AQjSr6k7xDMdhTBZCKFA%2FSk3ZI2ER4HXctPJIyNlFKpgRfUOQT17KgJIUkMClWpl1v%2BrdsXP1eHh%2BwxjbrWY&X-Amz-Signature=400d54824641b1028902d285bd14f94b51a6face0aadda51ca8c30da76a91bbf&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Agora clique em aplicar para salvar a atualização e pode fazer um teste de impressão.
+
+## 📝 Tag para finalizar o chat

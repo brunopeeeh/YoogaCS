@@ -1,0 +1,71 @@
+{
+  "name": "Scenario",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo do cen\u00e1rio"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o detalhada do cen\u00e1rio"
+    },
+    "client_profile": {
+      "type": "string",
+      "enum": [
+        "irritado",
+        "confuso",
+        "objetivo",
+        "indeciso",
+        "emotivo",
+        "impaciente",
+        "detalhista"
+      ],
+      "description": "Perfil do cliente simulado"
+    },
+    "initial_problem": {
+      "type": "string",
+      "description": "Problema ou situa\u00e7\u00e3o inicial apresentada pelo cliente"
+    },
+    "difficulty_level": {
+      "type": "string",
+      "enum": [
+        "iniciante",
+        "intermediario",
+        "avancado"
+      ],
+      "description": "N\u00edvel de dificuldade do cen\u00e1rio"
+    },
+    "goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Objetivos e metas do cen\u00e1rio"
+    },
+    "context": {
+      "type": "string",
+      "description": "Contexto adicional sobre o produto/servi\u00e7o"
+    },
+    "expected_interactions": {
+      "type": "number",
+      "description": "N\u00famero esperado de intera\u00e7\u00f5es para resolu\u00e7\u00e3o"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "inativo",
+        "rascunho"
+      ],
+      "default": "ativo",
+      "description": "Status do cen\u00e1rio"
+    }
+  },
+  "required": [
+    "title",
+    "client_profile",
+    "initial_problem",
+    "difficulty_level"
+  ]
+}

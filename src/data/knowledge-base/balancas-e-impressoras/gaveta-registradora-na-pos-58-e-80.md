@@ -1,0 +1,33 @@
+---
+title: "Gaveta Registradora na Pos 58 e 80"
+category: "Balancas E Impressoras"
+source: "https://www.notion.so/Gaveta-Registradora-na-Pos-58-e-80-24300ee50e90817f96f6f7553b983ea1"
+scraped_at: "2026-05-22T10:48:49.710Z"
+---
+
+# Gaveta Registradora na Pos 58 e 80
+
+## _Tópicos_
+
+[_Como configurar_](/24300ee50e90817f96f6f7553b983ea1)
+
+[_Tag para finalizar o chat_](/24300ee50e90817f96f6f7553b983ea1)
+
+---
+
+## 😎Como configurar
+
+Pressiona **Windows + R **para abrir a tela de executar, digite **control printers **e pressione OK.
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/a07a4fa0-cbe1-4985-844b-16c31fd76366/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466XPAT4ECG%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T104848Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIQCXNCldVCCzO7xc00Nxxt40u4TvysanD7%2BY0fRfs%2B8elQIgbUn0PC722waPZzQbaeafsmQCqggBc%2FO8txtOIXYhqJ8q%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDDOrK5fb7F38jjsDMircAz%2FuWtXghcYR4M%2FkC%2FupmaQD5Sy%2FmUumKkUli1J1SUBc1RgPhhL2A3QhYUQtve1KA2UuOgQzee3kDYdsccUtlagHfgXUgXfAKaW2T5yAP2H4fAxfxdLP2CC%2FkcWCPsVJhqIFwF%2Bcsro0cv8lnMVWxdN2sBuKWVlzPvdQ0jizzqpKstCEzF%2Fzfl1i%2FdRPnZQlI7sMIoXGleJMpjGgVCmPnJrB8H7w6dKKMm%2B7vzBr%2BW0xIHvAgWtayUZcdTpcfYRhGb8t0Q5Jd%2FmTuDPYG47oioaM%2BL4O9oLWmRSdk%2F1FypycyGBoVZCfVZ62gWxMOsZ7LoKA%2FD6OhxRQAV5f4jjk0c9L7IVSGRFEJL2actMlSuZaWNUbMIEq6svEuzHVyiMlipRi3jpbGcF9xSwA4RMs3RgnPMLgMwxVruE2gg0u3n8IEVy2E0pKVhViFQYy%2FcB1Syitr9TbxOuYWS34veeqk6TxYFKEW0xXVxHeLjrIPKppEQX9ZAz4275MKtR52zMKW6oJ%2FPIz6ON%2Fnwj6sdQN2Cj%2FJQ8GpgbXlHkXpC8eQYs2MrrjsKxrz6dnnBDMkoELfkCskTHrpc69zv4BibwhGY4x3mjmGx7rB72%2Bgh%2FfIkSa0sfYoZw382xj4abrMP2%2FwNAGOqUBlVf5hHUGUhGhHwYu6zzgKK6xctthRfsm0aP6tzJncdAqd2loI7PHK5AsS0WmvtY4JDxkTgPUu2LpDWcd4e97LmN6f96zXDSeOeRa5BIdfRaGaF7qH3BVEIeswmwP%2BzNC7nrq58jXRPnaUh0dEJlU4LJO5ljTyRoMExd41MqI9hSW2Q0SvbpHMmdUnkBvMaQVsqB6W7jxJW0vXV6YQHOY9eLmmB5%2F&X-Amz-Signature=a0e6e374ead487525fc55314df41e9b92852fb3e6ea4eb3d3625f397ce2b5256&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Por aqui clique com o botão direito sobre a impressora Pos 58 ou Pos 80 e selecione **propriedades da impressora.
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/a5cf530b-4cf8-48a0-a48e-e1ca996a06d7/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466XPAT4ECG%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T104848Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIQCXNCldVCCzO7xc00Nxxt40u4TvysanD7%2BY0fRfs%2B8elQIgbUn0PC722waPZzQbaeafsmQCqggBc%2FO8txtOIXYhqJ8q%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDDOrK5fb7F38jjsDMircAz%2FuWtXghcYR4M%2FkC%2FupmaQD5Sy%2FmUumKkUli1J1SUBc1RgPhhL2A3QhYUQtve1KA2UuOgQzee3kDYdsccUtlagHfgXUgXfAKaW2T5yAP2H4fAxfxdLP2CC%2FkcWCPsVJhqIFwF%2Bcsro0cv8lnMVWxdN2sBuKWVlzPvdQ0jizzqpKstCEzF%2Fzfl1i%2FdRPnZQlI7sMIoXGleJMpjGgVCmPnJrB8H7w6dKKMm%2B7vzBr%2BW0xIHvAgWtayUZcdTpcfYRhGb8t0Q5Jd%2FmTuDPYG47oioaM%2BL4O9oLWmRSdk%2F1FypycyGBoVZCfVZ62gWxMOsZ7LoKA%2FD6OhxRQAV5f4jjk0c9L7IVSGRFEJL2actMlSuZaWNUbMIEq6svEuzHVyiMlipRi3jpbGcF9xSwA4RMs3RgnPMLgMwxVruE2gg0u3n8IEVy2E0pKVhViFQYy%2FcB1Syitr9TbxOuYWS34veeqk6TxYFKEW0xXVxHeLjrIPKppEQX9ZAz4275MKtR52zMKW6oJ%2FPIz6ON%2Fnwj6sdQN2Cj%2FJQ8GpgbXlHkXpC8eQYs2MrrjsKxrz6dnnBDMkoELfkCskTHrpc69zv4BibwhGY4x3mjmGx7rB72%2Bgh%2FfIkSa0sfYoZw382xj4abrMP2%2FwNAGOqUBlVf5hHUGUhGhHwYu6zzgKK6xctthRfsm0aP6tzJncdAqd2loI7PHK5AsS0WmvtY4JDxkTgPUu2LpDWcd4e97LmN6f96zXDSeOeRa5BIdfRaGaF7qH3BVEIeswmwP%2BzNC7nrq58jXRPnaUh0dEJlU4LJO5ljTyRoMExd41MqI9hSW2Q0SvbpHMmdUnkBvMaQVsqB6W7jxJW0vXV6YQHOY9eLmmB5%2F&X-Amz-Signature=426c41fc4edca412affc7655806a73d7d41f2f8ea87864f505f6c464168e66e8&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Agora selecione **configurações do Dispositivo ** e na opção** Cash Drawer **(gaveta de dinheiro) selecione a opção **Open cash drawer after printing **(abrir gaveta de dinheiro após a impressão)**, **a configuração deve ser feita nas duas opções de abertura de gaveta caso tenha.
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/3e0bae14-33e9-4279-9545-760378589308/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466XPAT4ECG%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T104848Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIQCXNCldVCCzO7xc00Nxxt40u4TvysanD7%2BY0fRfs%2B8elQIgbUn0PC722waPZzQbaeafsmQCqggBc%2FO8txtOIXYhqJ8q%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDDOrK5fb7F38jjsDMircAz%2FuWtXghcYR4M%2FkC%2FupmaQD5Sy%2FmUumKkUli1J1SUBc1RgPhhL2A3QhYUQtve1KA2UuOgQzee3kDYdsccUtlagHfgXUgXfAKaW2T5yAP2H4fAxfxdLP2CC%2FkcWCPsVJhqIFwF%2Bcsro0cv8lnMVWxdN2sBuKWVlzPvdQ0jizzqpKstCEzF%2Fzfl1i%2FdRPnZQlI7sMIoXGleJMpjGgVCmPnJrB8H7w6dKKMm%2B7vzBr%2BW0xIHvAgWtayUZcdTpcfYRhGb8t0Q5Jd%2FmTuDPYG47oioaM%2BL4O9oLWmRSdk%2F1FypycyGBoVZCfVZ62gWxMOsZ7LoKA%2FD6OhxRQAV5f4jjk0c9L7IVSGRFEJL2actMlSuZaWNUbMIEq6svEuzHVyiMlipRi3jpbGcF9xSwA4RMs3RgnPMLgMwxVruE2gg0u3n8IEVy2E0pKVhViFQYy%2FcB1Syitr9TbxOuYWS34veeqk6TxYFKEW0xXVxHeLjrIPKppEQX9ZAz4275MKtR52zMKW6oJ%2FPIz6ON%2Fnwj6sdQN2Cj%2FJQ8GpgbXlHkXpC8eQYs2MrrjsKxrz6dnnBDMkoELfkCskTHrpc69zv4BibwhGY4x3mjmGx7rB72%2Bgh%2FfIkSa0sfYoZw382xj4abrMP2%2FwNAGOqUBlVf5hHUGUhGhHwYu6zzgKK6xctthRfsm0aP6tzJncdAqd2loI7PHK5AsS0WmvtY4JDxkTgPUu2LpDWcd4e97LmN6f96zXDSeOeRa5BIdfRaGaF7qH3BVEIeswmwP%2BzNC7nrq58jXRPnaUh0dEJlU4LJO5ljTyRoMExd41MqI9hSW2Q0SvbpHMmdUnkBvMaQVsqB6W7jxJW0vXV6YQHOY9eLmmB5%2F&X-Amz-Signature=33b038a3c0aba145b2fd05da89da9bd499901275f636329599f3e5ad0a0a4d91&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Agora clique em aplicar para salvar a atualização e pode fazer um teste de impressão.
+
+## 📝 Tag para finalizar o chat
