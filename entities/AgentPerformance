@@ -1,0 +1,39 @@
+{
+  "name": "AgentPerformance",
+  "type": "object",
+  "properties": {
+    "agent_email": {
+      "type": "string",
+      "description": "Email do agente"
+    },
+    "weak_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u00c1reas onde o agente tem dificuldades"
+    },
+    "strong_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "\u00c1reas onde o agente se destaca"
+    },
+    "last_analysis_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data da \u00faltima an\u00e1lise de performance"
+    },
+    "recommended_scenarios": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de cen\u00e1rios recomendados para melhoria"
+    }
+  },
+  "required": [
+    "agent_email"
+  ]
+}

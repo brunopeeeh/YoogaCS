@@ -1,0 +1,41 @@
+{
+  "name": "CompanyProfile",
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string",
+      "description": "Nome da empresa"
+    },
+    "tone_of_voice": {
+      "type": "string",
+      "description": "Diretrizes sobre o tom de voz da empresa a ser usado pela IA"
+    },
+    "knowledge_base_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags para categorizar o conte\u00fado do arquivo"
+          },
+          "description": {
+            "type": "string",
+            "description": "Breve descri\u00e7\u00e3o do conte\u00fado do arquivo"
+          }
+        }
+      },
+      "description": "Lista de arquivos da base de conhecimento com tags"
+    }
+  },
+  "required": []
+}
