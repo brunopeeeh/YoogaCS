@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Scenario, Simulation, CompanyProfile, AgentPerformance } from "@/entities/all";
 import { useUser } from "../components/auth/UserProvider";
 import { InvokeLLM, GetSemanticFaqContext } from "@/integrations/Core";
@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Module, Article, ensureKnowledgeReady } from "@/entities/Knowledge";
+import { addNotification } from "@/utils/notification-manager";
 
 import ScenarioSelector from "../components/simulator/ScenarioSelector";
 import ChatInterface from "../components/simulator/ChatInterface";
@@ -33,6 +34,20 @@ export default function Simulator() {
   const [prefillMessage, setPrefillMessage] = useState("");
   const [isLoadingData, setIsLoadingData] = useState(true);
   const MAX_SUGGESTIONS = 2;
+
+  const responseTimeoutRef = useRef(null);
+  const pendingAgentMessagesRef = useRef([]);
+  const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+    };
+  }, []);
 
   // Effect to set agent name when user data is available from the context
   useEffect(() => {
@@ -83,6 +98,7 @@ export default function Simulator() {
     setMessages([]);
     setSuggestionsUsed(0);
     setSuggestion(null);
+    setIsLoading(true); // Exibe loading durante a geração da saudação inicial
 
     try {
       const simulation = await Simulation.create({
@@ -95,7 +111,8 @@ export default function Simulator() {
 
       setCurrentSimulation(simulation);
 
-      const clientMessage = await generateClientResponse("", [], selectedScenario);
+      // Gerar saudação inicial dinâmica e curta
+      const clientMessage = await generateClientResponse(null, [], selectedScenario);
 
       const newMessages = [{
         sender: "client",
@@ -113,6 +130,8 @@ export default function Simulator() {
       setIsSimulating(false);
       setCurrentSimulation(null);
       setMessages([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -193,8 +212,11 @@ Você está terminantemente PROIBIDO de fazer novas reclamações, fingir que o 
     if (messageHistory.length === 0) {
       firstMessageInstruction = `
 [DIRETRIZ DE INÍCIO DE CHAT - CRÍTICA E ABSOLUTA]:
-Esta é a PRIMEIRA mensagem do chat. Você deve iniciar a simulação relatando O SEU PROBLEMA INICIAL: "${scenario.initial_problem}".
-Você não deve concordar com nenhuma solução ainda. Você é o cliente relatando sua dor pela primeira vez. Aja conforme seu perfil: ${scenario.client_profile.toUpperCase()}.`;
+Esta é a PRIMEIRA mensagem do chat.
+Você deve iniciar a simulação de forma muito curta e natural, sem explicar todo o seu problema técnico ainda.
+Mande apenas uma saudação inicial informal e uma reclamação bem vaga, impaciente ou confusa de acordo com o seu perfil de cliente Yooga (${scenario.client_profile.toUpperCase()}) e a situação do seu problema ("${scenario.initial_problem}").
+Use frases curtas, gírias e abreviações se adequadas ao perfil (ex: "Oi, tudo bem? Deu ruim aqui", "Socorro, minha impressora travou tudo!", "Oi, preciso de ajuda rápido, meu caixa não quer rodar").
+Você NÃO deve detalhar dados técnicos profundos (como margens de bobina, chaves CSC ou detalhes de divisão de pagamento) neste primeiro momento. Deixe o atendente responder primeiro com empatia e perguntar os detalhes antes de explicá-los.`;
     }
 
     const systemInstruction = `Você é um cliente real da Yooga no chat de suporte, conversando com o atendimento de Customer Success (CS).
@@ -203,24 +225,20 @@ Aja estritamente conforme seu perfil psicológico:
 ${getClientProfileInstructions(scenario.client_profile)}
 
 Você tem o seguinte problema inicial de suporte: "${scenario.initial_problem}".
-Abaixo está o FAQ técnico oficial da Yooga para sua referência de como resolver o problema. O atendente precisa passar passos compatíveis com este FAQ para te ajudar:
+Abaixo está o FAQ técnico oficial da Yooga para sua referência. O atendente da Yooga precisa te passar orientações compatíveis com este FAQ para resolver seu problema:
 ${faqContext}
 
-⚠️⚠️ DIRETRIZ ABSOLUTA DE RECONHECIMENTO DE SOLUÇÃO (OBRIGATÓRIO):
-Avalie minuciosamente a última resposta enviada pelo AGENTE DE CS.
-Compare as instruções dele com o FAQ Yooga fornecido acima. Se a resposta dele contiver a solução técnica correta ou os passos operacionais corretos próximos ao FAQ:
-- No caso offline: Se ele disser que as vendas ficam salvas no navegador, que NÃO deve fechar a aba/navegador/limpar dados, e que tudo sincroniza sozinho quando a internet voltar.
-- No caso iFood: Se ele disser para acessar Integrações > iFood, conferir se os produtos estão vinculados e disparar a atualização de preços/sincronização no painel.
-- No caso fiscal NFC-e: Se ele explicar que o erro indica CSC incorreto ou de homologação, e orientar a obter as chaves CSC de Produção com o contador para salvar no painel.
-- No caso de impressora: Se ele disser para ir em Ajustes > Geral > Impressão e alterar a largura da bobina para 56mm ou calibrar as margens.
-- No caso de divisão de caixa: Se ele orientar a clicar em pagar, digitar o valor parcial da primeira forma e adicionar a segunda para o restante.
-- No caso de senha: Se ele explicar como ativar a senha de cancelamento em Ajustes > Geral no app ou gerenciar permissões por cargo no painel administrativo.
+⚠️⚠️ DIRETRIZES CRÍTICAS DE CONVERSAÇÃO E INTERATIVIDADE (OBRIGATÓRIO):
+1. **Foco e Reatividade Estrita:** Responda exclusivamente ao que o atendente acabou de te dizer na última mensagem. Aja como um ser humano real no chat, nunca como um assistente de IA.
+2. **Anti-Vazamento de Contexto (NÃO ANTECIPE):** Nunca mencione ou discuta partes da solução (como caminhos de menu, chaves de acesso, configurações) que o atendente ainda não tiver abordado ativamente. Se o atendente apenas te cumprimentou ou fez uma pergunta inicial genérica, reaja de forma natural, simples e informal de acordo com o seu perfil, sem adivinhar a solução antes da hora.
+3. **Respostas Curtas e Realistas:** Mantenha suas mensagens curtas (no máximo 2 ou 3 frases curtas por mensagem). Use abreviações comuns de chat em português (como "vc", "tb", "obg", "tá", "pra") de forma natural.
+4. **Envio Consecutivo (Double Texting):** Sempre que fizer sentido para dar dinamismo, divida a sua mensagem em duas partes usando o delimitador "||" para simular o envio de mensagens consecutivas (ex: "Nossa, que dor de cabeça! || Pior que meu restaurante tá cheio...").
 
-Se o atendente passar essas orientações adequadas com empatia, você DEVE aceitar a solução imediatamente!
-Fica terminantemente PROIBIDO continuar sendo teimoso, fingir que a solução não funcionou, insistir que o procedimento está incorreto ou fazer novas perguntas capciosas.
-Aja com imenso alívio, confirme que entendeu o procedimento técnico e se despeça de forma amigável (ex: "Que alívio! Muito obrigado pela ajuda rápida, agora entendi tudo de verdade. Vou fazer exatamente esse passo a passo! Um abraço e boa semana!").
-
-Mantenha suas mensagens curtas (no máximo 2-3 frases), naturais e realistas. Reaja ao tom do atendente.
+⚠️⚠️ RECONHECIMENTO DE SOLUÇÃO E ENCERRAMENTO (OBRIGATÓRIO):
+Avalie a última mensagem enviada pelo atendente de CS:
+- Se a resposta dele contiver as orientações corretas, os passos operacionais ou caminhos de menu equivalentes aos descritos no FAQ oficial fornecido acima, você DEVE aceitar a solução imediatamente.
+- Fica proibido continuar teimoso, fingir que não funcionou ou fazer novas perguntas capciosas quando a instrução correta do FAQ já tiver sido repassada com clareza e empatia.
+- Responda demonstrando alívio e satisfação, confirme o entendimento e despeça-se de forma amigável (ex: "Que ótimo! Muito obrigado pela ajuda rápida, agora entendi tudo de verdade. Vou fazer exatamente esse passo a passo. Um abraço e boa semana!").
 ${forceEndingInstruction}
 ${firstMessageInstruction}`;
 
@@ -238,9 +256,9 @@ Gere sua próxima resposta curta como o cliente Yooga no chat.`;
 
     try {
       const response = await InvokeLLM({
-        prompt: agentMessage || scenario.initial_problem,
+        prompt: agentMessage || "",
         system_instruction: systemInstruction,
-        history: messageHistory.map(m => ({ sender: m.sender, message: m.message })),
+        history: messageHistory.slice(0, -1).map(m => ({ sender: m.sender, message: m.message })),
         client_profile: scenario.client_profile,
       });
       return response;
@@ -266,37 +284,73 @@ Gere sua próxima resposta curta como o cliente Yooga no chat.`;
   const sendMessage = async (messageText) => {
     if (!messageText.trim() || !currentSimulation) return;
 
-    setIsLoading(true);
+    // Adicionar imediatamente a mensagem do atendente ao chat para exibição instantânea
+    const agentMessage = {
+      sender: "agent",
+      message: messageText.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedMessages = [...messagesRef.current, agentMessage];
+    setMessages(updatedMessages);
+    pendingAgentMessagesRef.current.push(messageText.trim());
 
     try {
-      const agentMessage = {
-        sender: "agent",
-        message: messageText.trim(),
-        timestamp: new Date().toISOString()
-      };
-
-      const newMessages = [...messages, agentMessage];
-      setMessages(newMessages);
-
-      const clientResponse = await generateClientResponse(messageText, newMessages, selectedScenario);
-
-      const clientMessage = {
-        sender: "client",
-        message: clientResponse,
-        timestamp: new Date().toISOString()
-      };
-
-      const finalMessages = [...newMessages, clientMessage];
-      setMessages(finalMessages);
-
       await Simulation.update(currentSimulation.id, {
-        messages: finalMessages
+        messages: updatedMessages
       });
     } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
-    } finally {
-      setIsLoading(false);
+      console.error("Erro ao sincronizar mensagem do agente no banco:", error);
     }
+
+    // Limpar o timeout anterior se o atendente continuar enviando mensagens consecutivas
+    if (responseTimeoutRef.current) {
+      clearTimeout(responseTimeoutRef.current);
+    }
+
+    // Debounce de 2 segundos para rodar a resposta da IA (WhatsApp Dynamics)
+    responseTimeoutRef.current = setTimeout(async () => {
+      setIsLoading(true);
+
+      try {
+        // Agrupar todas as mensagens do atendente pendentes enviadas nesta rodada
+        const accumulatedText = pendingAgentMessagesRef.current.join(" \n ");
+        pendingAgentMessagesRef.current = [];
+
+        const clientResponse = await generateClientResponse(accumulatedText, messagesRef.current, selectedScenario);
+
+        // Suporte ao "Double Texting" delimitado por ||
+        const parts = clientResponse.split("||").map(p => p.trim()).filter(Boolean);
+
+        let currentList = [...messagesRef.current];
+
+        for (let i = 0; i < parts.length; i++) {
+          // Simular delay de digitação dinâmico para a segunda mensagem consecutiva do cliente
+          if (i > 0) {
+            setIsLoading(true);
+            const delay = Math.min(2500, Math.max(1000, parts[i].length * 35));
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+
+          const partMessage = {
+            sender: "client",
+            message: parts[i],
+            timestamp: new Date().toISOString()
+          };
+
+          currentList = [...currentList, partMessage];
+          setMessages(currentList);
+
+          await Simulation.update(currentSimulation.id, {
+            messages: currentList
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao gerar resposta do cliente:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 2000);
   };
 
   const handleRequestSuggestion = async () => {
@@ -415,6 +469,13 @@ Forneça o objeto JSON com "suggested_response" e "reasoning" em português.`;
         suggestions_used: suggestionsUsed,
         messages: messages
       });
+
+      addNotification(
+        "Simulação Concluída!",
+        `Você obteve nota ${evaluation.overall_score}% no cenário "${selectedScenario?.title || 'Cenário'}".`,
+        "simulation",
+        { simulationId: currentSimulation.id }
+      );
 
       setSimulationResults({
         ...currentSimulation,
@@ -607,6 +668,8 @@ Por favor, faça a análise detalhada e retorne o JSON com as chaves:
   };
 
   const resetSimulation = () => {
+    if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+    pendingAgentMessagesRef.current = [];
     setSelectedScenario(null);
     setCurrentSimulation(null);
     setMessages([]);

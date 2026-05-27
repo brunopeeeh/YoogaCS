@@ -1,5 +1,5 @@
-
 import React, { useState } from 'react';
+import { z } from "zod";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,18 @@ import { Label } from "@/components/ui/label";
 import { BrainCircuit, Wand2, XCircle, Loader2, Lightbulb, Zap, Tag } from "lucide-react";
 import { InvokeLLM } from "@/integrations/Core";
 import { Scenario, CompanyProfile, AgentPerformance } from "@/entities/all"; // Added AgentPerformance
+
+const scenarioSchema = z.object({
+  title: z.string().min(3, "O título deve ter pelo menos 3 caracteres"),
+  description: z.string().min(10, "A descrição deve ter pelo menos 10 caracteres"),
+  client_profile: z.enum(["irritado", "confuso", "objetivo", "indeciso", "emotivo", "impaciente", "detalhista"]),
+  initial_problem: z.string().min(10, "O problema inicial deve ter pelo menos 10 caracteres"),
+  difficulty_level: z.enum(["iniciante", "intermediario", "avançado"]),
+  goals: z.array(z.string()).min(3, "O cenário precisa ter pelo menos 3 objetivos").max(5),
+  context: z.string().min(10, "O contexto deve ter pelo menos 10 caracteres"),
+  expected_interactions: z.number().min(3).max(8).optional().default(4),
+  status: z.string().default("ativo")
+});
 
 const SCENARIO_TYPES = [
   { 
@@ -60,6 +72,81 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
     { value: "suporte", label: "Suporte" },
     { value: "configuracao", label: "Configuração" }
   ];
+
+  const generateAndValidateScenario = async (promptText, file_urls, attempt = 1, maxAttempts = 3) => {
+    try {
+      const generatedData = await InvokeLLM({
+        prompt: promptText,
+        file_urls: file_urls,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            client_profile: { 
+              type: "string", 
+              enum: ["irritado", "confuso", "objetivo", "indeciso", "emotivo", "impaciente", "detalhista"]
+            },
+            initial_problem: { type: "string" },
+            difficulty_level: { 
+              type: "string", 
+              enum: ["iniciante", "intermediario", "avançado"]
+            },
+            goals: { 
+              type: "array", 
+              items: { type: "string" },
+              minItems: 3,
+              maxItems: 5
+            },
+            context: { type: "string" },
+            expected_interactions: { 
+              type: "number", 
+              minimum: 3, 
+              maximum: 8 
+            },
+            status: { 
+              type: "string",
+              enum: ["ativo"],
+              default: "ativo"
+            }
+          },
+          required: ["title", "client_profile", "initial_problem", "difficulty_level", "goals", "context"]
+        }
+      });
+
+      // Garantir e normalizar campos básicos
+      generatedData.status = "ativo";
+      if (generatedData.difficulty_level === "avancado") {
+        generatedData.difficulty_level = "avançado";
+      }
+
+      // Validar com Zod
+      const result = scenarioSchema.safeParse(generatedData);
+      
+      if (!result.success) {
+        console.warn(`[Zod Validation] Falha na tentativa ${attempt}/${maxAttempts}:`, result.error.format());
+        
+        if (attempt < maxAttempts) {
+          // Opção B: Fazer nova chamada à API/LLM automaticamente, enviando os erros de validação para a IA se auto-corrigir
+          const errorsFormatted = JSON.stringify(result.error.format());
+          const correctivePrompt = `${promptText}\n\n⚠️ ATENÇÃO: A tentativa anterior gerou um JSON inválido com os seguintes erros de validação Zod. Por favor, certifique-se de preencher e formatar todos os campos corretamente desta vez:\n${errorsFormatted}`;
+          return await generateAndValidateScenario(correctivePrompt, file_urls, attempt + 1, maxAttempts);
+        } else {
+          // Esgotado, levantar erro amigável listando campos inválidos
+          const invalidFields = Object.keys(result.error.format()).filter(k => k !== "_errors");
+          throw new Error(`Não foi possível gerar um cenário válido após várias tentativas. Campos inválidos gerados pelo LLM: ${invalidFields.join(', ')}.`);
+        }
+      }
+
+      return result.data;
+    } catch (err) {
+      if (attempt < maxAttempts && !err.message.includes("gerar um cenário válido")) {
+        // Tentar novamente em caso de erros de rede/LLM comuns
+        return await generateAndValidateScenario(promptText, file_urls, attempt + 1, maxAttempts);
+      }
+      throw err;
+    }
+  };
 
   const handleQuickGenerate = async (scenarioType) => {
     setIsLoading(true);
@@ -118,58 +205,15 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
         Retorne um JSON com a estrutura do cenário:
       `;
 
-      const generatedData = await InvokeLLM({
-        prompt: prompt,
-        file_urls: file_urls,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            description: { type: "string" },
-            client_profile: { 
-              type: "string", 
-              enum: ["irritado", "confuso", "objetivo", "indeciso", "emotivo", "impaciente", "detalhista"]
-            },
-            initial_problem: { type: "string" },
-            difficulty_level: { 
-              type: "string", 
-              enum: ["iniciante", "intermediario", "avançado"]
-            },
-            goals: { 
-              type: "array", 
-              items: { type: "string" },
-              minItems: 3,
-              maxItems: 5
-            },
-            context: { type: "string" },
-            expected_interactions: { 
-              type: "number", 
-              minimum: 3, 
-              maximum: 8 
-            },
-            status: { 
-              type: "string",
-              enum: ["ativo"],
-              default: "ativo"
-            }
-          },
-          required: ["title", "client_profile", "initial_problem", "difficulty_level", "goals", "context"]
-        }
-      });
+      const validatedData = await generateAndValidateScenario(prompt, file_urls);
       
-      // Garantir que o status seja 'ativo'
-      generatedData.status = "ativo";
-      if (generatedData.difficulty_level === "avancado") {
-        generatedData.difficulty_level = "avançado";
-      }
-      
-      await Scenario.create(generatedData);
+      await Scenario.create(validatedData);
       onScenarioGenerated();
       onCancel();
 
     } catch (err) {
       console.error("Erro ao gerar cenário:", err);
-      setError("Não foi possível gerar o cenário. Tente novamente.");
+      setError(err.message || "Não foi possível gerar o cenário. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
@@ -229,54 +273,15 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
         Retorne um JSON com a estrutura completa do cenário:
       `;
 
-      const generatedData = await InvokeLLM({
-        prompt: prompt,
-        file_urls: file_urls,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            description: { type: "string" },
-            client_profile: { 
-              type: "string", 
-              enum: ["irritado", "confuso", "objetivo", "indeciso", "emotivo", "impaciente", "detalhista"]
-            },
-            initial_problem: { type: "string" },
-            difficulty_level: { 
-              type: "string", 
-              enum: ["iniciante", "intermediario", "avançado"]
-            },
-            goals: { 
-              type: "array", 
-              items: { type: "string" },
-              minItems: 3,
-              maxItems: 5
-            },
-            context: { type: "string" },
-            expected_interactions: { 
-              type: "number", 
-              minimum: 3, 
-              maximum: 8 
-            },
-            status: { 
-              type: "string",
-              enum: ["ativo"],
-              default: "ativo"
-            }
-          },
-          required: ["title", "client_profile", "initial_problem", "difficulty_level", "goals", "context"]
-        }
-      });
+      const validatedData = await generateAndValidateScenario(prompt, file_urls);
       
-      generatedData.status = "ativo";
-      
-      await Scenario.create(generatedData);
+      await Scenario.create(validatedData);
       onScenarioGenerated();
       onCancel();
 
     } catch (err) {
       console.error("Erro ao gerar cenário:", err);
-      setError("Não foi possível gerar o cenário. Tente um tópico diferente.");
+      setError(err.message || "Não foi possível gerar o cenário. Tente um tópico diferente.");
     } finally {
       setIsLoading(false);
     }

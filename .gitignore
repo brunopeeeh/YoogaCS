@@ -32,3 +32,12 @@ dist-ssr
 # Agent config and temporary files
 .agent/mcp_config.json
 test-gemini-temp.js
+
+# Python cache & virtual environments
+__pycache__/
+*.pyc
+backend/.venv/
+
+# Test reports and results
+playwright-report/
+test-results/

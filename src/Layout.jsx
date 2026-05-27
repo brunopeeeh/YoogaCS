@@ -3,6 +3,8 @@ import React from "react";
 import { Link, useLocation, Navigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { UserProvider, useUser } from "./components/auth/UserProvider"; // Importar o Provider e o hook
+import SyncStatusIndicator from "./components/sync/SyncStatusIndicator";
+import NotificationBell from "./components/notifications/NotificationBell";
 import { 
   MessageSquare, 
   LayoutDashboard, 
@@ -12,7 +14,8 @@ import {
   ShieldCheck,
   FileText,
   LogOut,
-  BookOpen
+  BookOpen,
+  Menu
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,6 +29,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 
@@ -44,6 +48,19 @@ const adminNavItems = [
   { title: "Gerenciar Usuários", url: createPageUrl("ManageUsers"), icon: Users },
   { title: "Configurações", url: createPageUrl("Settings"), icon: Settings },
 ];
+
+const MobileSidebarTrigger = () => {
+  const { toggleSidebar } = useSidebar();
+  return (
+    <button
+      onClick={toggleSidebar}
+      className="p-2 -ml-2 mr-2 text-slate-600 hover:text-[#002D62] hover:bg-slate-100/50 rounded-xl transition-all duration-200 cursor-pointer active:scale-95 flex items-center justify-center"
+      aria-label="Toggle Sidebar"
+    >
+      <Menu className="w-5 h-5" />
+    </button>
+  );
+};
 
 function AppLayout({ children, currentPageName }) {
   const location = useLocation();
@@ -164,12 +181,29 @@ function AppLayout({ children, currentPageName }) {
         </Sidebar>
 
         <main className="flex-1 flex flex-col">
-          <header className="lg:hidden border-b border-slate-200/60 bg-white/80 backdrop-blur-sm p-4">
+          <header className="border-b border-slate-200/60 bg-white/60 backdrop-blur-md px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+            {/* Esquerda: Menu Mobile e Identificação */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-lg flex items-center justify-center shadow-sm">
-                <MessageSquare className="w-5 h-5 text-white" />
+              <div className="lg:hidden">
+                <MobileSidebarTrigger />
               </div>
-              <h1 className="font-bold text-lg text-slate-900">CS Coach</h1>
+              <div className="flex items-center gap-2 lg:hidden">
+                <div className="w-8 h-8 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-lg flex items-center justify-center shadow-sm">
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </div>
+                <h1 className="font-bold text-base text-slate-900">CS Coach</h1>
+              </div>
+              <div className="hidden lg:flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-100/80 px-2.5 py-1 rounded-md">
+                  Yooga CS Coach
+                </span>
+              </div>
+            </div>
+            
+            {/* Direita: Indicador de Sincronização + Sino de Notificações */}
+            <div className="flex items-center gap-3.5">
+              <SyncStatusIndicator />
+              <NotificationBell />
             </div>
           </header>
           

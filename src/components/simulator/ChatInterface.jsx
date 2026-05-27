@@ -202,8 +202,9 @@ export default function ChatInterface({
                   className="flex-1 min-h-[60px] max-h-32 resize-none bg-white"
                   disabled={isLoading}
                 />
-                 <p className="text-xs text-slate-500 mt-2">
-                    Shift+Enter para nova linha
+                 <p className="text-xs text-slate-500 mt-2 flex justify-between">
+                    <span>Shift+Enter para nova linha</span>
+                    <span className="text-blue-600/80 font-medium">Você pode enviar várias mensagens consecutivas!</span>
                  </p>
               </div>
               <div className="flex flex-col gap-2">
