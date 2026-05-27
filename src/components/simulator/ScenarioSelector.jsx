@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Play, User, MessageSquare } from "lucide-react";
+import { Play, User, MessageSquare, ChevronLeft } from "lucide-react";
 
 const profileColors = {
   "irritado": "bg-red-100 text-red-800",
@@ -33,6 +33,91 @@ export default function ScenarioSelector({
   modules = []
 }) {
   const canStart = selectedScenario && agentName.trim();
+
+  // Modo Focado: Se houver um cenário selecionado, exibe apenas a tela de foco dele
+  if (selectedScenario) {
+    const scenarioModule = modules.find(m => m.id === selectedScenario.moduleId);
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        {/* Card Focado do Cenário */}
+        <Card className="bg-white/70 backdrop-blur-md border-slate-200/80 rounded-2xl shadow-xl overflow-hidden border-t-4 border-t-[#FF6600]">
+          <CardHeader className="bg-gradient-to-b from-slate-50/50 to-transparent pb-4">
+            <div className="flex flex-wrap gap-2 mb-3">
+              {scenarioModule && (
+                <Badge className="bg-orange-50 text-[#FF6600] border border-orange-100 font-semibold rounded-lg">
+                  Trilha: {scenarioModule.name}
+                </Badge>
+              )}
+              <Badge className={`${profileColors[selectedScenario.client_profile] || 'bg-slate-100 text-slate-700'} rounded-lg font-medium`}>
+                Cliente {selectedScenario.client_profile}
+              </Badge>
+              <Badge className={`${difficultyColors[selectedScenario.difficulty_level] || 'bg-slate-100 text-slate-700'} rounded-lg font-medium`}>
+                Dificuldade: {selectedScenario.difficulty_level}
+              </Badge>
+              {selectedScenario.expected_interactions && (
+                <Badge variant="outline" className="rounded-lg border-slate-200 text-slate-500 bg-white">
+                  ~{selectedScenario.expected_interactions} interações
+                </Badge>
+              )}
+            </div>
+            <CardTitle className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight">
+              {selectedScenario.title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {selectedScenario.description && (
+              <p className="text-slate-600 text-base leading-relaxed">
+                {selectedScenario.description}
+              </p>
+            )}
+
+            <div className="bg-gradient-to-r from-orange-50/80 to-transparent border border-orange-100/50 p-5 rounded-2xl">
+              <span className="text-xs font-bold text-[#FF6600] uppercase tracking-wider block mb-1">Contexto Inicial do Cliente</span>
+              <p className="text-slate-800 text-base font-medium leading-relaxed">
+                "{selectedScenario.initial_problem}"
+              </p>
+            </div>
+
+            {selectedScenario.goals && selectedScenario.goals.length > 0 && (
+              <div className="space-y-3 bg-slate-50/50 border border-slate-100 p-5 rounded-2xl">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Objetivos e Critérios de Sucesso</span>
+                <ul className="grid grid-cols-1 gap-2.5">
+                  {selectedScenario.goals.map((goal, index) => (
+                    <li key={index} className="flex items-start gap-3 text-slate-700 leading-relaxed text-sm">
+                      <span className="text-[#FF6600] mt-1.5 w-1.5 h-1.5 rounded-full bg-[#FF6600] flex-shrink-0" />
+                      {goal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Botões de Ação na altura dos olhos */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+          <Button
+            onClick={() => onScenarioSelect(null)}
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto h-14 px-8 text-base gap-2.5 rounded-2xl border-slate-200 hover:bg-slate-100 text-slate-600 transition-all cursor-pointer font-semibold order-2 sm:order-1"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-500" />
+            Escolher outro cenário
+          </Button>
+
+          <Button
+            onClick={onStartSimulation}
+            size="lg"
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 h-14 px-10 text-lg gap-3 rounded-2xl shadow-lg shadow-emerald-600/10 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer text-white font-semibold order-1 sm:order-2"
+          >
+            <Play className="w-5.5 h-5.5 text-white fill-white" />
+            Iniciar Simulação
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -178,27 +263,12 @@ export default function ScenarioSelector({
           )}
         </CardContent>
       </Card>
-
-      {/* Start Button */}
-      {scenarios.length > 0 && (
-        <div className="text-center">
-          <Button
-            onClick={onStartSimulation}
-            disabled={!canStart}
-            size="lg"
-            className="bg-emerald-600 hover:bg-emerald-700 h-14 px-8 text-lg gap-3 rounded-2xl shadow-lg shadow-emerald-600/10 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer text-white font-semibold"
-          >
-            <Play className="w-5 h-5 text-white" />
-            Iniciar Simulação
-          </Button>
-          
-          {!canStart && (
-            <p className="text-sm text-slate-400 mt-2">
-              Selecione um cenário para continuar
-            </p>
-          )}
-        </div>
-      )}
+      
+      <div className="text-center py-4">
+        <p className="text-sm text-slate-400">
+          Selecione um cenário acima para iniciar seu treinamento de Customer Success
+        </p>
+      </div>
     </div>
   );
 }

@@ -1,94 +1,31 @@
 import { Scenario } from "./all.js";
+import { generateId, now, createLocalEntity } from "./base.js";
 
 /**
  * Entidades locais para a Base de Conhecimento Yooga e Trilhas de Aprendizado.
  */
 
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
-
-function now() {
-  return new Date().toISOString();
-}
-
 function createEntity(storageKey) {
-  const getAll = () => {
-    try {
-      return JSON.parse(localStorage.getItem(storageKey) || '[]');
-    } catch {
-      return [];
-    }
-  };
-
-  const saveAll = (items) => {
-    localStorage.setItem(storageKey, JSON.stringify(items));
-  };
-
+  const local = createLocalEntity(storageKey);
   return {
     async list(orderBy = '-created_date') {
-      let items = getAll();
-      const desc = orderBy.startsWith('-');
-      const field = orderBy.replace(/^-/, '');
-      items = items.sort((a, b) => {
-        const va = a[field] ?? '';
-        const vb = b[field] ?? '';
-        return desc ? (va < vb ? 1 : -1) : (va > vb ? 1 : -1);
-      });
-      return items;
+      return local.list(orderBy);
     },
-
     async filter(criteria = {}, orderBy = '-created_date', limit = 100) {
-      let items = getAll();
-      items = items.filter(item =>
-        Object.entries(criteria).every(([k, v]) => {
-          if (item[k] === undefined) return false;
-          return item[k].toString().toLowerCase() === v.toString().toLowerCase();
-        })
-      );
-      const desc = orderBy.startsWith('-');
-      const field = orderBy.replace(/^-/, '');
-      items = items.sort((a, b) => {
-        const va = a[field] ?? '';
-        const vb = b[field] ?? '';
-        return desc ? (va < vb ? 1 : -1) : (va > vb ? 1 : -1);
-      });
-      return items.slice(0, limit);
+      return local.filter(criteria, orderBy, limit);
     },
-
     async get(id) {
-      const items = getAll();
-      return items.find(i => i.id === id) || null;
+      return local.get(id);
     },
-
     async create(data) {
-      const items = getAll();
-      const newItem = {
-        id: generateId(),
-        created_date: now(),
-        updated_date: now(),
-        created_by: 'local',
-        ...data,
-      };
-      items.push(newItem);
-      saveAll(items);
-      return newItem;
+      return local.create(data);
     },
-
     async update(id, data) {
-      const items = getAll();
-      const idx = items.findIndex(i => i.id === id);
-      if (idx === -1) throw new Error('Item não encontrado');
-      items[idx] = { ...items[idx], ...data, updated_date: now() };
-      saveAll(items);
-      return items[idx];
+      return local.update(id, data);
     },
-
     async delete(id) {
-      const items = getAll().filter(i => i.id !== id);
-      saveAll(items);
-      return { id };
-    },
+      return local.delete(id);
+    }
   };
 }
 
@@ -99,6 +36,26 @@ export const QuizAttempt = createEntity('db_quiz_attempts');
 export const Certification = createEntity('db_certifications');
 
 let knowledgeInitPromise = null;
+
+async function getOrCreateScenario(scenarioData) {
+  try {
+    const existing = await Scenario.list();
+    const found = existing.find(
+      s => s.title.trim().toLowerCase() === scenarioData.title.trim().toLowerCase()
+    );
+    if (found) {
+      console.log(`[Yooga Seed] Cenário "${scenarioData.title}" já existe (ID: ${found.id}). Pulando criação.`);
+      return found;
+    }
+  } catch (err) {
+    console.warn(`[Yooga Seed] Erro ao listar cenários para verificar unicidade de "${scenarioData.title}":`, err.message);
+  }
+  
+  return await Scenario.create({
+    ...scenarioData,
+    skipSyncQueue: true
+  });
+}
 
 async function initializeKnowledgeDatabase() {
   try {
@@ -254,7 +211,7 @@ Passo a passo para ativar:
       });
       
       // Criar Cenários padrão atrelados aos Módulos
-      await Scenario.create({
+      await getOrCreateScenario({
         title: "Venda Offline: Internet caiu no almoço",
         description: "Um operador de caixa desesperado com a queda da internet no meio do almoço teme perder suas vendas.",
         initial_problem: "Socorro! A internet caiu aqui no meio do expediente de almoço! Estamos cheios de clientes querendo pagar, posso continuar vendendo offline ou vou perder tudo?",
@@ -271,7 +228,7 @@ Passo a passo para ativar:
         moduleId: m1.id
       });
 
-      await Scenario.create({
+      await getOrCreateScenario({
         title: "Integração iFood: Preços divergentes",
         description: "Um restaurante está confuso sobre a discrepância de valores entre a Yooga e o portal iFood Merchant.",
         initial_problem: "Estou tendo problemas na integração. Os preços das minhas pizzas no iFood Merchant estão diferentes do que eu configurei no painel da Yooga. O que está acontecendo?",
@@ -288,7 +245,7 @@ Passo a passo para ativar:
         moduleId: m2.id
       });
 
-      await Scenario.create({
+      await getOrCreateScenario({
         title: "Rejeição Fiscal na NFC-e (Código CSC)",
         description: "Cliente impaciente com fila no caixa recebendo erro de 'Código CSC inválido ou não cadastrado'.",
         initial_problem: "Preciso de ajuda urgente! Estou com um cliente na boca do caixa esperando a nota fiscal dele, mas toda vez que tento emitir a NFC-e dá erro de rejeição 'Código CSC inválido ou não cadastrado na SEFAZ'. O que eu faço?",
@@ -309,95 +266,82 @@ Passo a passo para ativar:
     
     // Sempre garantir que novos cenários com base no FAQ estendido existam (para testes imediatos do RAG)
     try {
-      const currentScenarios = await Scenario.list();
       const currentModules = await Module.list();
       const m1 = currentModules.find(m => m.name.includes("PDV")) || { id: "local-m1" };
       const m2 = currentModules.find(m => m.name.includes("Delivery")) || { id: "local-m2" };
 
       // 1. Impressora: Layout Cortado na Bobina
-      const hasLayout = currentScenarios.some(s => s.title.includes("Layout Cortado na Bobina"));
-      if (!hasLayout) {
-        await Scenario.create({
-          title: "Impressora: Layout Cortado na Bobina",
-          description: "O cliente está nervoso porque a impressão térmica sai cortada nas laterais na nova impressora de 58mm.",
-          initial_problem: "Gente, me ajuda! Instalei a impressora térmica nova Bematech no caixa de 58mm, mas quando imprimo o pedido o texto sai todo cortado na lateral! Os motoboys não conseguem ler o endereço e está uma confusão. O que eu faço?",
-          client_profile: "irritado",
-          difficulty_level: "intermediario",
-          expected_interactions: 4,
-          goals: [
-            "Acalmar o cliente com empatia sobre a confusão com os motoboys.",
-            "Explicar como acessar a configuração de Impressoras no painel Yooga.",
-            "Instruir a alterar a largura da bobina para 58mm no layout ou ajustar as margens verticais e horizontais.",
-            "Clicar em Salvar e fazer uma impressão de teste para validar."
-          ],
-          status: "ativo",
-          moduleId: m1.id
-        });
-      }
+      await getOrCreateScenario({
+        title: "Impressora: Layout Cortado na Bobina",
+        description: "O cliente está nervoso porque a impressão térmica sai cortada nas laterais na nova impressora de 58mm.",
+        initial_problem: "Gente, me ajuda! Instalei a impressora térmica nova Bematech no caixa de 58mm, mas quando imprimo o pedido o texto sai todo cortado na lateral! Os motoboys não conseguem ler o endereço e está uma confusão. O que eu faço?",
+        client_profile: "irritado",
+        difficulty_level: "intermediario",
+        expected_interactions: 4,
+        goals: [
+          "Acalmar o cliente com empatia sobre a confusão com os motoboys.",
+          "Explicar como acessar a configuração de Impressoras no painel Yooga.",
+          "Instruir a alterar a largura da bobina para 58mm no layout ou ajustar as margens verticais e horizontais.",
+          "Clicar em Salvar e fazer uma impressão de teste para validar."
+        ],
+        status: "ativo",
+        moduleId: m1.id
+      });
 
       // 2. Caixa: Dividir Pagamento no PDV
-      const hasSplit = currentScenarios.some(s => s.title.includes("Dividir Pagamento"));
-      if (!hasSplit) {
-        await Scenario.create({
-          title: "Caixa: Dividir Pagamento no PDV",
-          description: "O atendente está confuso sobre como registrar múltiplas formas de pagamento na mesma venda.",
-          initial_problem: "Olá, equipe. Estou com uma mesa de clientes aqui no balcão que quer rachar a conta. Eles querem pagar R$ 50,00 em dinheiro e os outros R$ 30,00 no Pix. Como que eu lanço essas duas formas de pagamento juntas na mesma venda pra fechar o caixa certinho?",
-          client_profile: "confuso",
-          difficulty_level: "iniciante",
-          expected_interactions: 4,
-          goals: [
-            "Mostrar o passo a passo de clicar em 'Pagar' no fechamento do pedido no PDV.",
-            "Orientar a digitar primeiro o valor parcial (R$ 50,00) no campo de pagamento.",
-            "Instruir a selecionar 'Dinheiro' e clicar em 'Adicionar Pagamento' para registrar a primeira parte.",
-            "Mostrar como escolher a segunda forma de pagamento (Pix) para o saldo devedor restante (R$ 30,00) e concluir a venda."
-          ],
-          status: "ativo",
-          moduleId: m1.id
-        });
-      }
+      await getOrCreateScenario({
+        title: "Caixa: Dividir Pagamento no PDV",
+        description: "O atendente está confuso sobre como registrar múltiplas formas de pagamento na mesma venda.",
+        initial_problem: "Olá, equipe. Estou com uma mesa de clientes aqui no balcão que quer rachar a conta. Eles querem pagar R$ 50,00 em dinheiro e os outros R$ 30,00 no Pix. Como que eu lanço essas duas formas de pagamento juntas na mesma venda pra fechar o caixa certinho?",
+        client_profile: "confuso",
+        difficulty_level: "iniciante",
+        expected_interactions: 4,
+        goals: [
+          "Mostrar o passo a passo de clicar em 'Pagar' no fechamento do pedido no PDV.",
+          "Orientar a digitar primeiro o valor parcial (R$ 50,00) no campo de pagamento.",
+          "Instruir a selecionar 'Dinheiro' e clicar em 'Adicionar Pagamento' para registrar a primeira parte.",
+          "Mostrar como escolher a segunda forma de pagamento (Pix) para o saldo devedor restante (R$ 30,00) e concluir a venda."
+        ],
+        status: "ativo",
+        moduleId: m1.id
+      });
 
       // 3. Segurança: Senha para Cancelamentos
-      const hasSecurity = currentScenarios.some(s => s.title.includes("Senha para Cancelamentos"));
-      if (!hasSecurity) {
-        await Scenario.create({
-          title: "Segurança: Senha para Cancelamentos",
-          description: "O gerente de um restaurante quer bloquear operadores de caixa comuns de cancelarem pedidos sem permissão.",
-          initial_problem: "Olá! Estou desconfiado de que alguns operadores de caixa estão cancelando pedidos depois que os clientes pagam em dinheiro para desviar o caixa. Como eu faço para colocar uma senha ou bloquear o cancelamento no caixa comum?",
-          client_profile: "detalhista",
-          difficulty_level: "intermediario",
-          expected_interactions: 4,
-          goals: [
-            "Explicar como acessar o Painel Administrativo > Configurações > Permissões de Usuários.",
-            "Orientar a selecionar o cargo de 'Operador de Caixa' e desmarcar a opção 'Permitir Cancelamento de Vendas'.",
-            "Explicar que a partir do bloqueio, o PDV exigirá a digitação da senha de um Administrador ou Gerente para concluir qualquer cancelamento.",
-            "Indicar que os cancelamentos ficam auditados no relatório de justificativas financeiras."
-          ],
-          status: "ativo",
-          moduleId: m1.id
-        });
-      }
+      await getOrCreateScenario({
+        title: "Segurança: Senha para Cancelamentos",
+        description: "O gerente de um restaurante quer bloquear operadores de caixa comuns de cancelarem pedidos sem permissão.",
+        initial_problem: "Olá! Estou desconfiado de que alguns operadores de caixa estão cancelando pedidos depois que os clientes pagam em dinheiro para desviar o caixa. Como eu faço para colocar uma senha ou bloquear o cancelamento no caixa comum?",
+        client_profile: "detalhista",
+        difficulty_level: "intermediario",
+        expected_interactions: 4,
+        goals: [
+          "Explicar como acessar o Painel Administrativo > Configurações > Permissões de Usuários.",
+          "Orientar a selecionar o cargo de 'Operador de Caixa' e desmarcar a opção 'Permitir Cancelamento de Vendas'.",
+          "Explicar que a partir do bloqueio, o PDV exigirá a digitação da senha de um Administrador ou Gerente para concluir qualquer cancelamento.",
+          "Indicar que os cancelamentos ficam auditados no relatório de justificativas financeiras."
+        ],
+        status: "ativo",
+        moduleId: m1.id
+      });
 
       // 4. Delivery: Ativar o Chat de Pedidos
-      const hasChat = currentScenarios.some(s => s.title.includes("Chat de Pedidos"));
-      if (!hasChat) {
-        await Scenario.create({
-          title: "Delivery: Ativar o Chat de Pedidos",
-          description: "O cliente deseja centralizar a comunicação com seus compradores diretamente no link de pedidos do delivery, dispensando o uso de WhatsApp.",
-          initial_problem: "Olá! Vi que os clientes vivem me chamando no WhatsApp pra perguntar se o pedido já saiu pra entrega ou pra pedir pra tirar a cebola de última hora. Tem como os clientes conversarem comigo direto pelo link de pedidos do Delivery da Yooga, sem ter que ficar mandando mensagem no meu WhatsApp comercial?",
-          client_profile: "confuso",
-          difficulty_level: "iniciante",
-          expected_interactions: 4,
-          goals: [
-            "Confirmar que a Yooga possui a funcionalidade nativa de Chat no Delivery",
-            "Orientar o caminho exato de ativação: Ajustes > Configurações > Habilitar chat",
-            "Explicar que para o estabelecimento a opção 'Chat com o cliente' aparece ao clicar sobre o pedido no painel de delivery",
-            "Explicar que para o cliente o botão 'Chat com a loja' fica disponível na tela/link de acompanhamento do pedido",
-            "Mencionar que essa função é ideal para evitar o desvio para o WhatsApp e centralizar o suporte do restaurante"
-          ],
-          status: "ativo",
-          moduleId: m2.id
-        });
-      }
+      await getOrCreateScenario({
+        title: "Delivery: Ativar o Chat de Pedidos",
+        description: "O cliente deseja centralizar a comunicação com seus compradores diretamente no link de pedidos do delivery, dispensando o uso de WhatsApp.",
+        initial_problem: "Olá! Vi que os clientes vivem me chamando no WhatsApp pra perguntar se o pedido já saiu pra entrega ou pra pedir pra tirar a cebola de última hora. Tem como os clientes conversarem comigo direto pelo link de pedidos do Delivery da Yooga, sem ter que ficar mandando mensagem no meu WhatsApp comercial?",
+        client_profile: "confuso",
+        difficulty_level: "iniciante",
+        expected_interactions: 4,
+        goals: [
+          "Confirmar que a Yooga possui a funcionalidade nativa de Chat no Delivery",
+          "Orientar o caminho exato de ativação: Ajustes > Configurações > Habilitar chat",
+          "Explicar que para o estabelecimento a opção 'Chat com o cliente' aparece ao clicar sobre o pedido no painel de delivery",
+          "Explicar que para o cliente o botão 'Chat com a loja' fica disponível na tela/link de acompanhamento do pedido",
+          "Mencionar que essa função é ideal para evitar o desvio para o WhatsApp e centralizar o suporte do restaurante"
+        ],
+        status: "ativo",
+        moduleId: m2.id
+      });
     } catch (scErr) {
       console.error("Erro ao popular cenários de FAQ estendido:", scErr);
     }

@@ -66,11 +66,20 @@ export async function InvokeLLM({
       headers["X-API-Key"] = BACKEND_API_KEY;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.warn(`[Core Client] Requisição para ${endpoint} expirou após 60s. Abortando...`);
+      controller.abort();
+    }, 60000);
+
     const res = await fetch(`${BACKEND_URL}${endpoint}`, {
       method: "POST",
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();

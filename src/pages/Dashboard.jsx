@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Scenario, Simulation } from "@/entities/all";
 import { useUser } from "../components/auth/UserProvider";
@@ -16,10 +15,14 @@ import StatsOverview from "../components/dashboard/StatsOverview";
 import RecentSimulations from "../components/dashboard/RecentSimulations";
 import QuickActions from "../components/dashboard/QuickActions";
 
+import { Certification } from "@/entities/Knowledge";
+import BadgeWall from "../components/dashboard/BadgeWall";
+
 export default function Dashboard() {
   const { user, isLoading: isUserLoading } = useUser(); // Get user from context
   const [scenarios, setScenarios] = useState([]);
   const [simulations, setSimulations] = useState([]);
+  const [certifications, setCertifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true); // This isLoading is for dashboard data, not user loading
 
   useEffect(() => {
@@ -32,18 +35,21 @@ export default function Dashboard() {
   const loadData = async (userEmail) => {
     setIsLoading(true);
     try {
-      const [scenariosData, simulationsData] = await Promise.all([
+      const [scenariosData, simulationsData, certificationsData] = await Promise.all([
         Scenario.list("-created_date"),
         // Filter simulations only for the current user received from context
-        Simulation.filter({ created_by: userEmail }, "-created_date", 10)
+        Simulation.filter({ created_by: userEmail }, "-created_date", 100),
+        Certification.filter({ created_by: userEmail }, "-created_date")
       ]);
       setScenarios(scenariosData);
       setSimulations(simulationsData);
+      setCertifications(certificationsData);
     } catch (error) {
       console.error("Erro ao carregar dados do dashboard:", error);
       // Clear data on error to prevent displaying stale/incorrect information
       setScenarios([]);
       setSimulations([]);
+      setCertifications([]);
     }
     setIsLoading(false);
   };
@@ -133,6 +139,11 @@ export default function Dashboard() {
             description="Meu desempenho"
           />
         </div>
+
+        {/* Mural de Conquistas */}
+        {!isLoading && (
+          <BadgeWall simulations={simulations} certifications={certifications} />
+        )}
 
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-3 gap-8">

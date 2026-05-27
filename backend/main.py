@@ -3,6 +3,7 @@ import json
 import random
 import asyncio
 import time
+import re
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Request
@@ -10,11 +11,87 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import google.generativeai as genai
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # Carregar variáveis de ambiente do diretório pai
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
-from rag_engine import get_semantic_faq_context
+# Provedor ativo e chaves
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek").lower()
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_REASONING_MODEL = os.getenv("DEEPSEEK_REASONING_MODEL", "deepseek-reasoning")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
+
+deepseek_client = None
+if DEEPSEEK_API_KEY:
+    deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
+    print(f"[Yooga API] OK - API do DeepSeek configurada. Chat: {DEEPSEEK_MODEL}, Reasoning: {DEEPSEEK_REASONING_MODEL} (Provedor ativo: {LLM_PROVIDER})")
+else:
+    print("[Yooga API] AVISO - DEEPSEEK_API_KEY nao configurada.")
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
+
+def supabase_request(table: str, method: str = "GET", body: Any = None, params: Optional[Dict[str, str]] = None) -> Any:
+    """Executa uma requisição REST direta à API PostgREST do Supabase (independente de SDK)."""
+    import urllib.request
+    import urllib.parse
+    
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("[Yooga Supabase] Erro - SUPABASE_URL ou SUPABASE_KEY não configurados.")
+        raise HTTPException(status_code=503, detail="Supabase não configurado no backend")
+        
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    
+    if params:
+        query_string = urllib.parse.urlencode(params)
+        url += f"?{query_string}"
+        
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+    
+    data_bytes = None
+    if body is not None:
+        data_bytes = json.dumps(body).encode("utf-8")
+        
+    req = urllib.request.Request(
+        url,
+        data=data_bytes,
+        headers=headers,
+        method=method
+    )
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_content = response.read().decode("utf-8")
+            if res_content:
+                return json.loads(res_content)
+            return []
+    except urllib.error.HTTPError as he:
+        err_msg = he.read().decode("utf-8")
+        print(f"[Yooga Supabase] Erro HTTP ({he.code}): {err_msg}")
+        raise HTTPException(status_code=he.code, detail=f"Erro no Supabase: {err_msg}")
+    except Exception as e:
+        print(f"[Yooga Supabase] Erro de conexão: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro de conexão com o banco: {e}")
+
+
+
+def is_llm_available() -> bool:
+    """Verifica se há algum provedor de LLM configurado e ativo."""
+    if LLM_PROVIDER == "deepseek" and DEEPSEEK_API_KEY:
+        return True
+    if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
+        return True
+    return False
+
+from rag_engine import get_semantic_faq_context, generate_deterministic_vector, dot_product
 
 # Inicializar FastAPI
 app = FastAPI(
@@ -32,9 +109,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Chave API do Gemini (somente servidor — nunca expor via VITE_)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
 
 # Rate limiting simples em memória (req/min por IP)
 _rate_limit_store: Dict[str, List[float]] = defaultdict(list)
@@ -95,10 +169,19 @@ class GenerateScenarioRequest(BaseModel):
 class RagSearchRequest(BaseModel):
     query: str
 
+class FilterRequest(BaseModel):
+    criteria: Optional[Dict[str, Any]] = {}
+    orderBy: Optional[str] = "-created_date"
+    limit: Optional[int] = 100
+
 # ─── Middleware de segurança ──────────────────────────────────────────────────
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
+    # Ignora validações de API Key e Rate Limiting para requisições de Preflight (OPTIONS)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     if request.url.path.startswith("/api/"):
         if BACKEND_API_KEY:
             api_key = request.headers.get("X-API-Key", "")
@@ -141,7 +224,338 @@ def build_rag_query(prompt: str, history: List[Message]) -> str:
     lines = [l.strip() for l in prompt.split("\n") if l.strip()]
     return lines[-1] if lines else prompt.strip()
 
+# ─── Cache Semântico Local para o Coach ───────────────────────────────────────
+
+import unicodedata
+
+def clean_text_for_cache(text: str) -> str:
+    # Normalizar diacríticos e acentos (ex: "faço" -> "faco")
+    nfd_form = unicodedata.normalize('NFD', text)
+    cleaned = "".join(c for c in nfd_form if unicodedata.category(c) != 'Mn')
+    return cleaned.lower()
+
+class SemanticCache:
+    def __init__(self, max_size: int = 100, threshold: float = 0.90):
+        self.max_size = max_size
+        self.threshold = threshold
+        self.entries: List[Dict[str, Any]] = []
+
+    def _get_words(self, text: str) -> set:
+        cleaned = clean_text_for_cache(text)
+        words = re.findall(r"\w+", cleaned)
+        return set(words)
+
+    def get(self, query: str) -> Optional[Dict[str, Any]]:
+        if not query or not query.strip():
+            return None
+        
+        query_words = self._get_words(query)
+        if not query_words:
+            return None
+
+        best_score = -1.0
+        best_entry = None
+
+        # Comparar similaridade Jaccard (conjuntos de palavras)
+        for entry in self.entries:
+            cached_words = entry["words"]
+            intersection = query_words.intersection(cached_words)
+            union = query_words.union(cached_words)
+            if union:
+                score = len(intersection) / len(union)
+                if score > best_score:
+                    best_score = score
+                    best_entry = entry
+
+        if best_entry and best_score >= self.threshold:
+            print(f"[Semantic Cache] HIT semântico perfeito! Jaccard Score: {best_score:.4f} (Economia de tokens!)")
+            return dict(best_entry["response"])
+            
+        return None
+
+    def set(self, query: str, response: Dict[str, Any]):
+        if not query or not query.strip() or not response:
+            return
+        
+        try:
+            query_words = self._get_words(query)
+            if len(self.entries) >= self.max_size:
+                self.entries.pop(0) # FIFO Eviction
+                
+            self.entries.append({
+                "query": query,
+                "words": query_words,
+                "response": dict(response)
+            })
+            print(f"[Semantic Cache] Registrado com sucesso. Tamanho: {len(self.entries)}")
+        except Exception as e:
+            print(f"[Semantic Cache] Erro ao registrar no cache: {e}")
+
+coach_semantic_cache = SemanticCache(max_size=100, threshold=0.90)
+
 # ─── Funções Auxiliares de LLM com Rotação de Modelos ────────────────────────
+
+def parse_json_resilient(raw_text: str) -> Dict[str, Any]:
+    """Sanitiza, repara e converte uma string de retorno da IA em um dicionário Python de forma robusta."""
+    if not raw_text:
+        return {}
+    
+    cleaned = raw_text.strip()
+    
+    # 1. Remover cercas de código markdown
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+    cleaned = cleaned.strip()
+    
+    # 2. Tentar parse imediato (caso o JSON seja perfeito)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+        
+    # 3. Se falhou, aplica sanitizações adicionais
+    try:
+        # A. Remove vírgulas sobressalentes antes de fechamento (trailing commas)
+        cleaned_sanitized = re.sub(r",\s*([\]}])", r"\1", cleaned)
+        
+        # B. Tentar reparar aspas simples ao redor de chaves/valores
+        cleaned_sanitized = re.sub(r"'(\w+)'\s*:", r'"\1":', cleaned_sanitized)
+        cleaned_sanitized = re.sub(r":\s*'([^']*)'", r': "\1"', cleaned_sanitized)
+        
+        # C. Normalizar booleanos e None do Python para JSON (True -> true, False -> false, None -> null)
+        cleaned_sanitized = re.sub(r"\bTrue\b", "true", cleaned_sanitized)
+        cleaned_sanitized = re.sub(r"\bFalse\b", "false", cleaned_sanitized)
+        cleaned_sanitized = re.sub(r"\bNone\b", "null", cleaned_sanitized)
+        
+        try:
+            return json.loads(cleaned_sanitized)
+        except json.JSONDecodeError:
+            pass
+            
+        # D. Caso extremo: A IA adicionou texto conversacional antes ou depois do objeto JSON
+        # Encontra o primeiro '{' e o último '}'
+        start_idx = cleaned.find("{")
+        end_idx = cleaned.rfind("}")
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            extracted = cleaned[start_idx:end_idx+1]
+            try:
+                return json.loads(extracted)
+            except json.JSONDecodeError:
+                pass
+                
+            # Tenta aplicar todas as sanitizações no trecho extraído
+            extracted_sanitized = re.sub(r",\s*([\]}])", r"\1", extracted)
+            extracted_sanitized = re.sub(r"'(\w+)'\s*:", r'"\1":', extracted_sanitized)
+            extracted_sanitized = re.sub(r":\s*'([^']*)'", r': "\1"', extracted_sanitized)
+            extracted_sanitized = re.sub(r"\bTrue\b", "true", extracted_sanitized)
+            extracted_sanitized = re.sub(r"\bFalse\b", "false", extracted_sanitized)
+            extracted_sanitized = re.sub(r"\bNone\b", "null", extracted_sanitized)
+            
+            try:
+                return json.loads(extracted_sanitized)
+            except json.JSONDecodeError:
+                pass
+                
+    except Exception as e:
+        print(f"[Yooga Resilient Parser] Falha de sanitização: {e}")
+        
+    return {}
+
+def invoke_deepseek_text(prompt: str, system_instruction: str = "") -> str:
+    """Invoca o DeepSeek em formato texto puro."""
+    if not deepseek_client:
+        return ""
+    try:
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        response = deepseek_client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=messages,
+            stream=False
+        )
+        if response and response.choices:
+            content = response.choices[0].message.content
+            print(f"[Yooga API] Sucesso com o modelo DeepSeek: {DEEPSEEK_MODEL}")
+            return content.strip() if content else ""
+    except Exception as e:
+        print(f"[Yooga API] Erro ao chamar DeepSeek: {e}")
+    return ""
+
+def extract_clean_rag_query(prompt: str) -> str:
+    """Extrai os termos principais de busca de prompts grandes para evitar poluição semântica no RAG."""
+    if not prompt:
+        return ""
+    # 1. Tentar extrair o tópico customizado
+    custom_match = re.search(r'baseado no tópico:\s*["\']([^"\']+)["\']', prompt, re.IGNORECASE)
+    if custom_match:
+        return custom_match.group(1).strip()
+    
+    # 2. Tentar extrair o tipo de cenário e áreas de foco
+    type_match = re.search(r'TIPO DE CENÁRIO:\s*["\']([^"\']+)["\']', prompt, re.IGNORECASE)
+    focus_match = re.search(r'FOCAR NAS ÁREAS:\s*([^\n]+)', prompt, re.IGNORECASE)
+    
+    query_parts = []
+    if type_match:
+        query_parts.append(type_match.group(1).strip())
+    if focus_match:
+        query_parts.append(focus_match.group(1).strip())
+        
+    if query_parts:
+        return " ".join(query_parts)
+        
+    return prompt[:100].strip() # Fallback padrão
+
+def invoke_deepseek_chat(messages: List[Dict[str, str]]) -> str:
+    """Invoca o DeepSeek passando uma estrutura nativa de mensagens de chat."""
+    if not deepseek_client:
+        return ""
+    try:
+        response = deepseek_client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=messages,
+            stream=False
+        )
+        if response and response.choices:
+            content = response.choices[0].message.content
+            print(f"[Yooga API] Sucesso de Chat com o modelo DeepSeek: {DEEPSEEK_MODEL}")
+            return content.strip() if content else ""
+    except Exception as e:
+        print(f"[Yooga API] Erro ao chamar DeepSeek Chat: {e}")
+    return ""
+
+def invoke_gemini_chat(messages: List[Dict[str, str]], system_instruction: str = "") -> str:
+    """Invoca o Gemini em formato chat estruturado, rotacionando modelos para evitar limites de cota."""
+    if not GEMINI_API_KEY:
+        return ""
+        
+    gemini_contents = []
+    for msg in messages:
+        if msg["role"] == "system":
+            continue
+        # Mapeia "assistant" -> "model"
+        role = "user" if msg["role"] == "user" else "model"
+        gemini_contents.append({"role": role, "parts": [msg["content"]]})
+        
+    for model_name in MODEL_CHAIN:
+        try:
+            config = {}
+            if system_instruction:
+                config["system_instruction"] = system_instruction
+                
+            model = genai.GenerativeModel(model_name=model_name, **config)
+            response = model.generate_content(gemini_contents)
+            if response and response.text:
+                print(f"[Yooga API] Sucesso de Chat com o modelo Gemini: {model_name}")
+                return response.text.strip()
+        except Exception as e:
+            print(f"[Yooga API] Erro no Chat com {model_name}: {e}. Tentando próximo...")
+    
+    return ""
+
+def invoke_llm_chat(messages: List[Dict[str, str]], system_instruction: str = "") -> str:
+    """Invoca o chat estruturado no provedor ativo (DeepSeek ou Gemini), com fallback automático."""
+    if LLM_PROVIDER == "deepseek" and DEEPSEEK_API_KEY:
+        deepseek_messages = list(messages)
+        # Se houver system_instruction e não houver mensagem de sistema no topo, injeta
+        if system_instruction and not any(m["role"] == "system" for m in deepseek_messages):
+            deepseek_messages.insert(0, {"role": "system", "content": system_instruction})
+            
+        res = invoke_deepseek_chat(deepseek_messages)
+        if res:
+            return res
+        print("[Yooga API] AVISO - Falha no DeepSeek Chat. Utilizando fallback para Gemini Chat...")
+
+    if GEMINI_API_KEY:
+        return invoke_gemini_chat(messages, system_instruction)
+        
+    return ""
+
+def invoke_deepseek_json(prompt: str, schema_dict: Dict[str, Any], system_instruction: str = "", model_type: str = "chat") -> Dict[str, Any]:
+    """Invoca o DeepSeek exigindo retorno estruturado em JSON com base em um Schema, com suporte a Dual-Model."""
+    if not deepseek_client:
+        return {}
+        
+    # Decidir o modelo primário e o de fallback interno (Plano B)
+    if model_type == "reasoning" and DEEPSEEK_REASONING_MODEL:
+        primary_model = DEEPSEEK_REASONING_MODEL
+        fallback_model = DEEPSEEK_MODEL or "deepseek-chat"
+    else:
+        primary_model = DEEPSEEK_MODEL or "deepseek-chat"
+        fallback_model = None
+
+    schema_instruction = f"\nVocê DEVE retornar um objeto JSON que atenda rigorosamente ao seguinte JSON Schema:\n{json.dumps(schema_dict, ensure_ascii=False)}"
+    final_instruction = system_instruction or ""
+    final_instruction += schema_instruction
+    if "JSON" not in final_instruction:
+        final_instruction += "\nResponda APENAS com um objeto JSON válido, sem marcações markdown de bloco."
+    
+    messages = []
+    messages.append({"role": "system", "content": final_instruction})
+    messages.append({"role": "user", "content": prompt})
+
+    def execute_call(model_name: str) -> Dict[str, Any]:
+        kwargs = {
+            "model": model_name,
+            "messages": messages,
+            "stream": False
+        }
+        
+        # O modelo deepseek-reasoning oficial não suporta response_format={"type": "json_object"}
+        if "reasoning" not in model_name.lower():
+            kwargs["response_format"] = {"type": "json_object"}
+            
+        # Adicionar parâmetros de thinking/reasoning se for modelo de raciocínio/pro
+        if "reasoning" in model_name.lower() or "pro" in model_name.lower():
+            kwargs["extra_body"] = {"thinking": {"type": "enabled"}}
+            kwargs["reasoning_effort"] = "high"
+
+        try:
+            response = deepseek_client.chat.completions.create(**kwargs)
+        except Exception as e:
+            # Se falhar devido aos parâmetros extras de thinking do provider, tenta chamada simplificada
+            if any(k in str(e) for k in ["extra_body", "thinking", "reasoning_effort"]):
+                print(f"[Yooga API] Parâmetros extras não suportados pelo provider no modelo {model_name}. Tentando sem extra_body...")
+                kwargs.pop("extra_body", None)
+                kwargs.pop("reasoning_effort", None)
+                response = deepseek_client.chat.completions.create(**kwargs)
+            else:
+                raise e
+
+        if response and response.choices:
+            content = response.choices[0].message.content
+            parsed = parse_json_resilient(content)
+            if parsed and isinstance(parsed, dict):
+                # Tentar extrair os logs de pensamento (thinking) do DeepSeek R1
+                reasoning_content = getattr(response.choices[0].message, "reasoning_content", None)
+                if reasoning_content:
+                    parsed["_thinking_log"] = reasoning_content
+                return parsed
+        return {}
+
+    try:
+        # Tenta a chamada com o modelo primário
+        parsed = execute_call(primary_model)
+        if parsed:
+            print(f"[Yooga API] Sucesso estruturado com DeepSeek ({primary_model})")
+            return parsed
+    except Exception as e:
+        print(f"[Yooga API] Erro estruturado ao chamar modelo primário {primary_model}: {e}")
+        
+    # Se falhou e temos um fallback do DeepSeek configurado (Plano B), tenta o fallback
+    if fallback_model:
+        try:
+            print(f"[Yooga API] Iniciando Plano B: Fallback interno do DeepSeek para {fallback_model}...")
+            parsed = execute_call(fallback_model)
+            if parsed:
+                print(f"[Yooga API] Sucesso estruturado com fallback DeepSeek ({fallback_model})")
+                return parsed
+        except Exception as e_fallback:
+            print(f"[Yooga API] Erro estruturado ao chamar fallback {fallback_model}: {e_fallback}")
+            
+    return {}
 
 def invoke_gemini_text(prompt: str, system_instruction: str = "") -> str:
     """Invoca o Gemini em formato texto puro, rotacionando modelos caso ocorram cotas 429."""
@@ -188,10 +602,11 @@ def invoke_gemini_json(prompt: str, schema_dict: Dict[str, Any], system_instruct
             response = model.generate_content(prompt, generation_config=generation_config)
 
             if response and response.text:
-                clean_text = response.text.replace("```json", "").replace("```", "").strip()
-                parsed = json.loads(clean_text)
-                print(f"[Yooga API] Sucesso estruturado com o modelo: {model_name}")
-                return parsed
+                parsed = parse_json_resilient(response.text)
+                if parsed:
+                    print(f"[Yooga API] Sucesso estruturado com o modelo: {model_name}")
+                    return parsed
+                raise ValueError("JSON parse failed or empty object returned")
         except Exception as e:
             print(f"[Yooga API] Erro estruturado ao chamar {model_name} (com schema): {e}. Tentando sem schema...")
             try:
@@ -202,14 +617,41 @@ def invoke_gemini_json(prompt: str, schema_dict: Dict[str, Any], system_instruct
                 model = genai.GenerativeModel(model_name=model_name, **config)
                 response = model.generate_content(prompt, generation_config=generation_config)
                 if response and response.text:
-                    clean_text = response.text.replace("```json", "").replace("```", "").strip()
-                    parsed = json.loads(clean_text)
-                    print(f"[Yooga API] Sucesso estruturado (fallback sem schema) com: {model_name}")
-                    return parsed
+                    parsed = parse_json_resilient(response.text)
+                    if parsed:
+                        print(f"[Yooga API] Sucesso estruturado (fallback sem schema) com: {model_name}")
+                        return parsed
+                    raise ValueError("JSON parse failed or empty object returned")
             except Exception as e2:
                 print(f"[Yooga API] Erro estruturado ao chamar {model_name}: {e2}. Tentando próximo...")
             
     print("[Yooga API] Todos os modelos de JSON falharam.")
+    return {}
+
+def invoke_llm_text(prompt: str, system_instruction: str = "") -> str:
+    """Invoca o provedor de LLM ativo (DeepSeek ou Gemini), com fallback robusto."""
+    if LLM_PROVIDER == "deepseek" and DEEPSEEK_API_KEY:
+        res = invoke_deepseek_text(prompt, system_instruction)
+        if res:
+            return res
+        print("[Yooga API] AVISO - Falha no DeepSeek. Utilizando fallback para Gemini...")
+
+    if GEMINI_API_KEY:
+        return invoke_gemini_text(prompt, system_instruction)
+        
+    return ""
+
+def invoke_llm_json(prompt: str, schema_dict: Dict[str, Any], system_instruction: str = "", model_type: str = "chat") -> Dict[str, Any]:
+    """Invoca o provedor estruturado ativo (DeepSeek ou Gemini), com fallback robusto."""
+    if LLM_PROVIDER == "deepseek" and DEEPSEEK_API_KEY:
+        res = invoke_deepseek_json(prompt, schema_dict, system_instruction, model_type=model_type)
+        if res:
+            return res
+        print("[Yooga API] AVISO - Falha estruturada no DeepSeek. Utilizando fallback para Gemini...")
+
+    if GEMINI_API_KEY:
+        return invoke_gemini_json(prompt, schema_dict, system_instruction)
+        
     return {}
 
 # ─── Endpoints da API ─────────────────────────────────────────────────────────
@@ -262,13 +704,13 @@ async def rag_stats():
 @app.post("/api/chat/simulate")
 async def simulate_chat(req: SimulateRequest):
     """
-    Simula a mensagem de resposta do cliente de suporte baseando-se no histórico,
+    Simula a mensagem de resposta do cliente de suporte baseando-se no histórico estruturado,
     perfil psicológico do cliente e regras sazonais.
     """
     rag_query = build_rag_query(req.prompt, req.history)
     context = get_semantic_faq_context(rag_query, FAQ_PATH) if not req.system_instruction else ""
 
-    if not GEMINI_API_KEY:
+    if not is_llm_available():
         return {"response": get_mock_client_response(req.prompt, context, req.client_profile)}
 
     system_instruction = req.system_instruction or f"""
@@ -287,15 +729,17 @@ async def simulate_chat(req: SimulateRequest):
     3. Responda em português brasileiro coloquial, de forma direta e curta (evite parágrafos longos e robóticos). Nunca se comporte como uma inteligência artificial ou assistente.
     """
 
-    chat_history_str = ""
+    # Mapear o histórico de mensagens ativamente para papéis estruturados nativos (agent -> user, client -> assistant)
+    chat_messages = []
     for msg in req.history:
-        role_label = "Atendente (Yooga CS)" if msg.sender == "agent" else "Cliente"
-        chat_history_str += f"{role_label}: {msg.message}\n"
+        role = "user" if msg.sender == "agent" else "assistant"
+        chat_messages.append({"role": role, "content": msg.message})
+    
+    # Injetar a mensagem atual do atendente (agent) à qual a IA precisa responder
     if req.prompt:
-        chat_history_str += f"Atendente (Yooga CS): {req.prompt}\n"
-    chat_history_str += "Cliente: "
+        chat_messages.append({"role": "user", "content": req.prompt})
 
-    response_text = await asyncio.to_thread(invoke_gemini_text, chat_history_str, system_instruction)
+    response_text = await asyncio.to_thread(invoke_llm_chat, chat_messages, system_instruction)
 
     if not response_text:
         response_text = get_mock_client_response(req.prompt, context, req.client_profile)
@@ -319,7 +763,7 @@ async def coach_assistant(req: CoachRequest):
         "required": ["suggested_response", "reasoning"]
     }
 
-    if not GEMINI_API_KEY:
+    if not is_llm_available():
         return get_mock_coach_response(context)
 
     if req.system_instruction:
@@ -346,11 +790,23 @@ async def coach_assistant(req: CoachRequest):
         chat_history_str += f"{role_label}: {msg.message}\n"
     chat_history_str += f"Cliente (última mensagem): {req.prompt}\nSugira a melhor resposta do Atendente Yooga no formato JSON solicitado."
 
-    parsed_json = await asyncio.to_thread(invoke_gemini_json, chat_history_str, schema, system_instruction)
+    # 1. Tentar recuperar do Cache Semântico
+    cached_response = coach_semantic_cache.get(chat_history_str)
+    if cached_response:
+        return cached_response
+
+    # 2. Se não encontrou, executa a chamada LLM
+    parsed_json = await asyncio.to_thread(invoke_llm_json, chat_history_str, schema, system_instruction, "reasoning")
 
     if not validate_coach_response(parsed_json):
         parsed_json = get_mock_coach_response(context)
+    else:
+        # Registrar no cache apenas se for uma resposta real válida
+        clean_cache_item = dict(parsed_json)
+        clean_cache_item.pop("_thinking_log", None)
+        coach_semantic_cache.set(chat_history_str, clean_cache_item)
 
+    parsed_json.pop("_thinking_log", None)
     return parsed_json
 
 @app.post("/api/chat/audit")
@@ -380,7 +836,7 @@ async def audit_chat(req: AuditRequest):
         ]
     }
     
-    if not GEMINI_API_KEY:
+    if not is_llm_available():
         return get_dynamic_offline_audit(req.history, req.goals)
 
     if req.system_instruction:
@@ -403,7 +859,7 @@ async def audit_chat(req: AuditRequest):
     INSTRUÇÕES CRÍTICAS PARA OS PONTOS FORTES E DE MELHORIA:
     1. Na lista "strengths" (pontos fortes), liste obrigatoriamente de 2 a 4 pontos específicos nos quais o analista se destacou na conversa (ex: uso de termos corretos do FAQ, tom acolhedor no início, excelente tratativa). Se o atendimento foi bom (nota acima de 70%), esta lista NUNCA deve vir vazia!
     2. Na lista "improvements" (áreas de melhoria), você deve listar apenas críticas construtivas e pontos que ele errou ou pode aprimorar.
-    3. Se o atendimento foi excelente (nota acima de 90%) e não houver pontos reais a melhorar, você DEVE retornar a lista de melhorias vazia [] ou apenas com ["Manter a excelente qualidade de atendimento"].
+    3. Se o atendimento foi excelente (nota acima de 90%) and não houver pontos reais a melhorar, você DEVE retornar a lista de melhorias vazia [] ou apenas com ["Manter a excelente qualidade de atendimento"].
     4. NUNCA coloque elogios ou afirmações de maestria (como "não há pontos significativos de melhoria" ou "demonstrou maestria") dentro do campo "improvements"! Todos os elogios, pontos positivos e reconhecimentos de maestria pertencem EXCLUSIVAMENTE ao campo "strengths".
 
     ATENÇÃO EXTREMA E CRÍTICA:
@@ -424,7 +880,7 @@ async def audit_chat(req: AuditRequest):
         chat_history_str += f"\n{req.prompt}\n"
     chat_history_str += "\nAvalie esta conversa e retorne a auditoria completa formatada no JSON requerido."
 
-    parsed_json = await asyncio.to_thread(invoke_gemini_json, chat_history_str, schema, system_instruction)
+    parsed_json = await asyncio.to_thread(invoke_llm_json, chat_history_str, schema, system_instruction, "reasoning")
 
     if not validate_audit_response(parsed_json):
         parsed_json = get_dynamic_offline_audit(req.history, req.goals)
@@ -435,9 +891,13 @@ async def audit_chat(req: AuditRequest):
         os.makedirs(dir_path, exist_ok=True)
         log_file_path = os.path.join(dir_path, "chat_logs.jsonl")
         
+        # Extrair metadado de raciocínio se houver e remover do payload limpo enviado ao usuário
+        thinking_log = parsed_json.pop("_thinking_log", None)
+        
         log_entry = {
             "scenario_title": req.scenario_title,
             "goals": req.goals,
+            "thinking_process": thinking_log,
             "audit_results": {
                 "overall_score": parsed_json.get("overall_score"),
                 "empathy_score": parsed_json.get("empathy_score"),
@@ -451,7 +911,7 @@ async def audit_chat(req: AuditRequest):
         
         with open(log_file_path, "a", encoding="utf-8") as lf:
             lf.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
-        print(f"[Yooga API] OK - Historico de simulacao salvo com sucesso em: {log_file_path}")
+        print(f"[Yooga API] OK - Historico de simulacao com thinking log salvo em: {log_file_path}")
     except Exception as log_err:
         print(f"[Yooga API] Erro ao salvar histórico de simulação para treino: {log_err}")
         
@@ -459,7 +919,7 @@ async def audit_chat(req: AuditRequest):
 
 @app.post("/api/scenarios/generate")
 async def generate_scenario(req: GenerateScenarioRequest):
-    """Gera um cenário de treinamento estruturado em JSON."""
+    """Gera um cenário de treinamento estruturado em JSON e enriquecido via RAG com artigos do FAQ."""
     schema = req.response_json_schema or {
         "type": "object",
         "properties": {
@@ -476,10 +936,14 @@ async def generate_scenario(req: GenerateScenarioRequest):
         "required": ["title", "client_profile", "initial_problem", "difficulty_level", "goals", "context"]
     }
 
-    if not GEMINI_API_KEY:
+    # 1. Executar busca RAG para fundamentar tecnicamente o cenário
+    clean_query = extract_clean_rag_query(req.prompt)
+    context = get_semantic_faq_context(clean_query, FAQ_PATH) if is_llm_available() else ""
+
+    if not is_llm_available():
         return {
             "title": "Cenário offline",
-            "description": "Gerado localmente (sem API Gemini).",
+            "description": "Gerado localmente (sem API ativa).",
             "client_profile": "irritado",
             "initial_problem": req.prompt[:300] if req.prompt else "Preciso de ajuda com o sistema Yooga.",
             "difficulty_level": "intermediario",
@@ -489,13 +953,27 @@ async def generate_scenario(req: GenerateScenarioRequest):
             "status": "ativo"
         }
 
-    system_instruction = req.system_instruction or """
-    Você é um especialista em Customer Success da Yooga.
-    Gere um cenário de treinamento realista para agentes de suporte.
+    # Injetar o manual técnico do FAQ se algum artigo relevante foi encontrado
+    rag_instructions = ""
+    if context:
+        rag_instructions = f"""
+    Manual Técnico Oficial da Yooga para fundamentação:
+    {context}
+    
+    INSTRUÇÕES IMPORTANTES:
+    1. Baseie as metas de resolução do cenário ("goals") estritamente nos procedimentos corretos contidos no Manual Técnico acima.
+    2. No campo "context" (contexto técnico), mencione de forma resumida as regras técnicas ou caminhos de menu reais do sistema Yooga indicados no FAQ.
+    """
+
+    system_instruction = req.system_instruction or f"""
+    Você é um especialista sênior em Customer Success e Treinamentos da Yooga.
+    Gere um cenário de treinamento simulado realista para analistas de suporte.
+    {rag_instructions}
+    
     Retorne APENAS um objeto JSON válido conforme o schema solicitado, em português brasileiro.
     """
 
-    parsed_json = await asyncio.to_thread(invoke_gemini_json, req.prompt, schema, system_instruction)
+    parsed_json = await asyncio.to_thread(invoke_llm_json, req.prompt, schema, system_instruction)
 
     if not validate_scenario_response(parsed_json):
         raise HTTPException(status_code=502, detail="Falha ao gerar cenário estruturado. Tente novamente.")
@@ -682,6 +1160,160 @@ def get_dynamic_offline_audit(history: List[Message], goals: List[str]) -> Dict[
             "Gestão de contatos em tempo real"
         ]
     }
+# ─── Endpoints de Banco de Dados Centralizado (Proxy Supabase) ───────────────
+
+def get_table_name(entity_name: str) -> str:
+    mapping = {
+        "db_users": "users",
+        "db_scenarios": "scenarios",
+        "db_simulations": "simulations",
+        "db_company_profiles": "company_profiles",
+        "db_agent_performances": "agent_performances"
+    }
+    return mapping.get(entity_name, entity_name)
+
+@app.get("/api/db/{entity}")
+async def db_list(entity: str, orderBy: Optional[str] = "-created_date"):
+    try:
+        table = get_table_name(entity)
+        desc = orderBy.startswith("-")
+        field = orderBy.replace("-", "")
+        if entity == "db_scenarios" and field == "moduleId":
+            field = "module_id"
+        order_direction = "desc" if desc else "asc"
+        
+        params = {"order": f"{field}.{order_direction}"}
+        res = supabase_request(table, "GET", params=params)
+        
+        # Mapeamento de volta para o frontend
+        if entity == "db_scenarios" and isinstance(res, list):
+            for item in res:
+                if "module_id" in item:
+                    item["moduleId"] = item.pop("module_id")
+                    
+        return res
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro no banco de dados: {e}")
+
+@app.post("/api/db/{entity}/filter")
+async def db_filter(entity: str, req: FilterRequest):
+    try:
+        table = get_table_name(entity)
+        desc = req.orderBy.startswith("-")
+        field = req.orderBy.replace("-", "")
+        if entity == "db_scenarios" and field == "moduleId":
+            field = "module_id"
+        order_direction = "desc" if desc else "asc"
+        
+        params = {
+            "order": f"{field}.{order_direction}",
+            "limit": str(req.limit)
+        }
+        
+        # Mapeia critérios para filtros do PostgREST
+        if req.criteria:
+            for k, v in req.criteria.items():
+                db_key = k
+                if entity == "db_scenarios" and k == "moduleId":
+                    db_key = "module_id"
+                    
+                if isinstance(v, str) and db_key == "created_by":
+                    params[db_key] = f"ilike.{v}"
+                else:
+                    params[db_key] = f"eq.{v}"
+                    
+        res = supabase_request(table, "GET", params=params)
+        
+        # Mapeamento de volta para o frontend
+        if entity == "db_scenarios" and isinstance(res, list):
+            for item in res:
+                if "module_id" in item:
+                    item["moduleId"] = item.pop("module_id")
+                    
+        return res
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao filtrar banco de dados: {e}")
+
+@app.get("/api/db/{entity}/{item_id}")
+async def db_get(entity: str, item_id: str):
+    try:
+        table = get_table_name(entity)
+        params = {"id": f"eq.{item_id}"}
+        res = supabase_request(table, "GET", params=params)
+        if res and len(res) > 0:
+            item = res[0]
+            if entity == "db_scenarios" and "module_id" in item:
+                item["moduleId"] = item.pop("module_id")
+            return item
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao obter item: {e}")
+
+@app.post("/api/db/{entity}")
+async def db_create(entity: str, data: Dict[str, Any]):
+    try:
+        table = get_table_name(entity)
+        
+        # Mapeamento de camelCase para snake_case
+        if entity == "db_scenarios" and "moduleId" in data:
+            data["module_id"] = data.pop("moduleId")
+            
+        res = supabase_request(table, "POST", body=data)
+        if res and len(res) > 0:
+            item = res[0]
+            if entity == "db_scenarios" and "module_id" in item:
+                item["moduleId"] = item.pop("module_id")
+            return item
+        raise HTTPException(status_code=500, detail="Erro ao criar registro")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao criar item: {e}")
+
+@app.put("/api/db/{entity}/{item_id}")
+async def db_update(entity: str, item_id: str, data: Dict[str, Any]):
+    try:
+        table = get_table_name(entity)
+        data.pop("created_date", None)
+        
+        # Mapeamento de camelCase para snake_case
+        if entity == "db_scenarios" and "moduleId" in data:
+            data["module_id"] = data.pop("moduleId")
+            
+        # updated_date pode ser atualizada via backend
+        import datetime
+        data["updated_date"] = datetime.datetime.utcnow().isoformat() + "Z"
+        
+        params = {"id": f"eq.{item_id}"}
+        res = supabase_request(table, "PATCH", body=data, params=params)
+        if res and len(res) > 0:
+            item = res[0]
+            if entity == "db_scenarios" and "module_id" in item:
+                item["moduleId"] = item.pop("module_id")
+            return item
+        raise HTTPException(status_code=404, detail="Item não encontrado para atualização")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao atualizar item: {e}")
+
+@app.delete("/api/db/{entity}/{item_id}")
+async def db_delete(entity: str, item_id: str):
+    try:
+        table = get_table_name(entity)
+        params = {"id": f"eq.{item_id}"}
+        supabase_request(table, "DELETE", params=params)
+        return {"id": item_id, "deleted": True}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao deletar item: {e}")
 
 if __name__ == "__main__":
     import uvicorn
