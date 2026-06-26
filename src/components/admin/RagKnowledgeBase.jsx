@@ -590,7 +590,7 @@ Como ativar esse bloqueio de segurança:
               <CardDescription className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Base em Sessão</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-extrabold text-[#002D62]">{stats.sessionCount}</div>
+              <div className="text-2xl font-extrabold text-primary">{stats.sessionCount}</div>
               <p className="text-[10px] text-slate-500 font-medium">Armazenado temporariamente</p>
             </CardContent>
           </Card>
@@ -629,7 +629,7 @@ Como ativar esse bloqueio de segurança:
         <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-900">
-              <Globe className="w-5 h-5 text-blue-500" />
+              <Globe className="w-5 h-5 text-primary" />
               IA Ingestor de FAQ Yooga (RAG)
             </CardTitle>
             <CardDescription>
@@ -643,12 +643,12 @@ Como ativar esse bloqueio de segurança:
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Ex: https://ajuda.yooga.com.br/perguntas-frequentes"
-                className="flex-1 px-4 py-2 text-sm bg-white/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 font-medium"
+                className="flex-1 px-4 py-2 text-sm bg-white/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-700 font-medium"
               />
               <Button
                 onClick={handleIngest}
                 disabled={isIngesting || !url}
-                className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs px-4"
+                className="bg-primary hover:bg-yooga-primary-dark text-white rounded-xl font-bold text-xs px-4"
               >
                 {isIngesting ? "Processando..." : "Ingerir via IA"}
               </Button>
@@ -656,7 +656,7 @@ Como ativar esse bloqueio de segurança:
 
             <div className="border-t border-slate-200/60 pt-4 mt-2">
               <h5 className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-[#FF6600]" />
+                <Database className="w-3.5 h-3.5 text-yooga-accent" />
                 Vetorização Dinâmica e Sincronização do RAG (Solução Offline)
               </h5>
               <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
@@ -665,7 +665,7 @@ Como ativar esse bloqueio de segurança:
               <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={handleExportFullBase}
-                  className="bg-[#002D62] hover:bg-[#004094] text-white rounded-xl font-bold text-xs px-4 flex items-center gap-1.5 shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                  className="bg-primary hover:bg-yooga-primary-dark text-white rounded-xl font-bold text-xs px-4 flex items-center gap-1.5 shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Regenerar e Baixar faq-embeddings.json
@@ -715,7 +715,7 @@ Como ativar esse bloqueio de segurança:
         <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl h-full flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-900">
-              <Search className="w-5 h-5 text-[#FF6600]" />
+              <Search className="w-5 h-5 text-yooga-accent" />
               RAG Semantic Tester
             </CardTitle>
             <CardDescription>
@@ -730,11 +730,11 @@ Como ativar esse bloqueio de segurança:
                 onChange={(e) => setTestQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleTestSearch()}
                 placeholder="Qual sua dúvida operacional?"
-                className="flex-1 px-3.5 py-1.5 text-xs bg-white/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF6600]/20 text-slate-700 font-medium"
+                className="flex-1 px-3.5 py-1.5 text-xs bg-white/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yooga-accent/20 text-slate-700 font-medium"
               />
               <Button
                 onClick={handleTestSearch}
-                className="bg-[#002D62] hover:bg-[#004094] text-white rounded-xl font-bold text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
+                className="bg-primary hover:bg-yooga-primary-dark text-white rounded-xl font-bold text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
               >
                 Testar
               </Button>
@@ -754,7 +754,7 @@ Como ativar esse bloqueio de segurança:
                      <span>LATÊNCIA: {searchTime}ms</span>
                   </div>
                   {testResults.map((result, idx) => (
-                    <div key={idx} className="p-3 bg-white/50 border border-slate-100 rounded-xl space-y-2 hover:border-[#FF6600]/30 transition-all hover:scale-[1.01] duration-200">
+                    <div key={idx} className="p-3 bg-white/50 border border-slate-100 rounded-xl space-y-2 hover:border-yooga-accent/30 transition-all hover:scale-[1.01] duration-200">
                       <div className="flex justify-between items-start">
                         <div className="min-w-0 pr-2">
                           <div className="flex items-center gap-1.5 flex-wrap mb-1">
@@ -763,7 +763,7 @@ Como ativar esse bloqueio de segurança:
                             ) : result.id.includes("-part-") ? (
                               <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[8px] font-bold rounded">FAQ Físico</span>
                             ) : (
-                              <span className="px-1.5 py-0.5 bg-orange-50 text-[#FF6600] border border-orange-100/50 text-[8px] font-bold rounded-md">Ingestão via IA</span>
+                              <span className="px-1.5 py-0.5 bg-orange-50 text-yooga-accent border border-yooga-accent/20 text-[8px] font-bold rounded-md">Ingestão via IA</span>
                             )}
                           </div>
                           <h6 className="font-bold text-xs text-slate-900 leading-tight">{result.title}</h6>

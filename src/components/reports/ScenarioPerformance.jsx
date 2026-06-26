@@ -66,7 +66,7 @@ export default function ScenarioPerformance({ simulations, scenarios, autoOpenSi
     <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
       <CardHeader>
         <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <MessageSquare className="w-5 h-5 text-blue-500" />
+          <MessageSquare className="w-5 h-5 text-yooga-primary" />
           Performance por Cenário
         </CardTitle>
       </CardHeader>
@@ -114,7 +114,7 @@ export default function ScenarioPerformance({ simulations, scenarios, autoOpenSi
                   
                   <div className="flex justify-between text-[10px] text-slate-500 mt-2 font-medium">
                     <span>Performance média</span>
-                    <span className={stat.averageScore >= 80 ? 'text-green-600 font-bold' : stat.averageScore >= 60 ? 'text-blue-600 font-bold' : 'text-slate-600 font-bold'}>
+                    <span className={stat.averageScore >= 80 ? 'text-green-600 font-bold' : stat.averageScore >= 60 ? 'text-yooga-primary font-bold' : 'text-slate-600 font-bold'}>
                       {stat.averageScore >= 80 ? 'Excelente' : 
                        stat.averageScore >= 60 ? 'Bom' : 'Precisa melhorar'}
                     </span>
@@ -159,7 +159,7 @@ export default function ScenarioPerformance({ simulations, scenarios, autoOpenSi
                                     <span className="text-xs font-bold text-slate-850">
                                       Tentativa #{scenarioSims.length - sIdx}
                                     </span>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${sim.evaluation?.overall_score >= 80 ? "bg-green-50 text-green-700" : sim.evaluation?.overall_score >= 60 ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${sim.evaluation?.overall_score >= 80 ? "bg-green-50 text-green-700" : sim.evaluation?.overall_score >= 60 ? "bg-sky-50 text-sky-700" : "bg-slate-100 text-slate-600"}`}>
                                       {sim.evaluation?.overall_score ?? 0}%
                                     </span>
                                   </div>
@@ -181,7 +181,7 @@ export default function ScenarioPerformance({ simulations, scenarios, autoOpenSi
                                       setSelectedSimulation(sim);
                                       setIsModalOpen(true);
                                     }}
-                                    className="px-3 py-1.5 bg-[#002D62] hover:bg-[#004094] text-white rounded-lg font-bold text-[10px] flex items-center gap-1 hover:scale-[1.02] active:scale-[0.98] transition-all border-0 cursor-pointer shadow-sm shadow-blue-900/10"
+                                    className="px-3 py-1.5 bg-yooga-primary hover:bg-yooga-primary-dark text-white rounded-lg font-bold text-[10px] flex items-center gap-1 hover:scale-[1.02] active:scale-[0.98] transition-all border-0 cursor-pointer shadow-sm shadow-yooga-primary/10"
                                   >
                                     <MessageSquare className="w-3 h-3" />
                                     Ver Transcrição

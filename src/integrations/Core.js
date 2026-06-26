@@ -1,1 +1,1 @@
-export { InvokeLLM, UploadFile, GetSemanticFaqContext } from "./Core.ts";
+export { InvokeLLM, UploadFile, GetSemanticFaqContext, NudgeClient } from "./Core.ts";

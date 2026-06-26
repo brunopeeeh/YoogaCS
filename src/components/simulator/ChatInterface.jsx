@@ -19,7 +19,8 @@ export default function ChatInterface({
   suggestionsUsed,
   maxSuggestions,
   prefillMessage,
-  onPrefillConsumed
+  onPrefillConsumed,
+  onTyping
 }) {
   const [currentMessage, setCurrentMessage] = useState("");
   const messagesEndRef = useRef(null);
@@ -38,6 +39,7 @@ export default function ChatInterface({
     if (prefillMessage) {
       setCurrentMessage(prefillMessage);
       onPrefillConsumed?.();
+      onTyping?.();
       // Focar no textarea para o agente poder editar/enviar
       textareaRef.current?.focus();
     }
@@ -80,7 +82,7 @@ export default function ChatInterface({
   }
 
   const hasMetTechnicalGoal = keywords.some(kw => historyText.includes(kw));
-  const hasMetExpectedInteractions = agentMsgs.length >= (scenario.expected_interactions || 4) - 1;
+  const hasMetExpectedInteractions = agentMsgs.length >= ((scenario?.expected_interactions || 4) - 1);
   const isClientSatisfied = agentMsgs.length > 0 && (hasMetTechnicalGoal || hasMetExpectedInteractions);
 
   return (
@@ -92,7 +94,7 @@ export default function ChatInterface({
             <div>
               <CardTitle className="text-lg">{scenario.title}</CardTitle>
               <div className="flex gap-2 mt-2">
-                <Badge className="bg-blue-50 text-[#002D62] border border-blue-100/50 rounded-lg">
+                <Badge className="bg-primary/10 text-primary border border-primary/20 rounded-lg">
                   Cliente {scenario.client_profile}
                 </Badge>
                 <Badge variant="outline">
@@ -148,7 +150,7 @@ export default function ChatInterface({
               >
                 <div className={`max-w-xs lg:max-w-md xl:max-w-lg ${
                   message.sender === 'agent' 
-                    ? 'bg-[#002D62] text-white rounded-l-2xl rounded-tr-2xl' 
+                    ? 'bg-primary text-white rounded-l-2xl rounded-tr-2xl' 
                     : 'bg-slate-100 text-slate-900 rounded-r-2xl rounded-tl-2xl'
                 } px-4 py-3 shadow-sm`}>
                   <div className="flex items-center gap-2 mb-1">
@@ -178,7 +180,7 @@ export default function ChatInterface({
                     <Bot className="w-4 h-4" />
                     <span className="text-xs font-medium opacity-80">Cliente</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" role="status" aria-live="polite">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm text-slate-600">Digitando...</span>
                   </div>
@@ -196,7 +198,10 @@ export default function ChatInterface({
                 <Textarea
                   ref={textareaRef}
                   value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentMessage(e.target.value);
+                    onTyping?.();
+                  }}
                   onKeyDown={handleKeyDown}
                   placeholder="Digite sua resposta como agente de CS..."
                   className="flex-1 min-h-[60px] max-h-32 resize-none bg-white"
@@ -204,14 +209,14 @@ export default function ChatInterface({
                 />
                  <p className="text-xs text-slate-500 mt-2 flex justify-between">
                     <span>Shift+Enter para nova linha</span>
-                    <span className="text-blue-600/80 font-medium">Você pode enviar várias mensagens consecutivas!</span>
+                    <span className="text-primary/80 font-medium">Você pode enviar várias mensagens consecutivas!</span>
                  </p>
               </div>
               <div className="flex flex-col gap-2">
                 <Button
                   onClick={handleSendMessage}
                   disabled={!currentMessage.trim() || isLoading}
-                  className="bg-[#002D62] hover:bg-[#004094] h-10 w-24 rounded-xl hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer shadow-sm"
+                  className="bg-primary hover:bg-yooga-primary-dark h-10 w-24 rounded-xl hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer shadow-sm"
                 >
                   <Send className="w-4 h-4 mr-2" /> Enviar
                 </Button>

@@ -77,7 +77,7 @@ export default function SyncStatusIndicator() {
         </span>
         <CloudLightning className={`w-4 h-4 ${!isOnline ? "text-red-500" : "text-amber-500"}`} />
         <span className="text-xs">
-          {!isOnline ? "Modo Offline" : "Dados Locais"} {pendingCount > 0 && `(${pendingCount})`}
+          {!isOnline ? "Modo Offline" : ""} {pendingCount > 0 && `(${pendingCount})`}
         </span>
       </Badge>
 

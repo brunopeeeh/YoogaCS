@@ -6,14 +6,15 @@ import { ptBR } from "date-fns/locale";
 
 export default function PerformanceChart({ simulations }) {
   const chartData = simulations
-    .slice(-10) // Últimas 10 simulações
+    .filter(s => s.evaluation)
+    .slice(-10)
     .map((sim, index) => ({
       session: `#${index + 1}`,
-      overall: sim.evaluation.overall_score,
-      empathy: sim.evaluation.empathy_score,
-      resolution: sim.evaluation.resolution_score,
-      professionalism: sim.evaluation.professionalism_score,
-      agility: sim.evaluation.agility_score,
+      overall: sim.evaluation.overall_score ?? 0,
+      empathy: sim.evaluation.empathy_score ?? 0,
+      resolution: sim.evaluation.resolution_score ?? 0,
+      professionalism: sim.evaluation.professionalism_score ?? 0,
+      agility: sim.evaluation.agility_score ?? 0,
       date: format(new Date(sim.created_date), 'dd/MM', { locale: ptBR })
     }));
 
@@ -77,7 +78,7 @@ export default function PerformanceChart({ simulations }) {
               <Line 
                 type="monotone" 
                 dataKey="overall" 
-                stroke="#3b82f6" 
+                stroke="#19A1E6" 
                 strokeWidth={3}
                 name="Pontuação Geral"
               />
@@ -85,7 +86,7 @@ export default function PerformanceChart({ simulations }) {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-
+ 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
           <CardHeader>
@@ -98,15 +99,15 @@ export default function PerformanceChart({ simulations }) {
                 <XAxis dataKey="session" className="text-slate-600" />
                 <YAxis domain={[0, 100]} className="text-slate-600" />
                 <Tooltip />
-                <Bar dataKey="empathy" fill="#10b981" name="Empatia" />
-                <Bar dataKey="resolution" fill="#3b82f6" name="Resolução" />
-                <Bar dataKey="professionalism" fill="#8b5cf6" name="Profissionalismo" />
-                <Bar dataKey="agility" fill="#f59e0b" name="Agilidade" />
+                <Bar dataKey="empathy" fill="#33BBAD" name="Empatia" />
+                <Bar dataKey="resolution" fill="#19A1E6" name="Resolução" />
+                <Bar dataKey="professionalism" fill="#4AC4F3" name="Profissionalismo" />
+                <Bar dataKey="agility" fill="#F45B93" name="Agilidade" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
-
+ 
         {completedSims.length > 0 ? (
           <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
             <CardHeader>
@@ -121,15 +122,15 @@ export default function PerformanceChart({ simulations }) {
                   <Radar 
                     name="Última" 
                     dataKey="Última Simulação" 
-                    stroke="#FF6600" 
-                    fill="#FF6600" 
+                    stroke="#F45B93" 
+                    fill="#F45B93" 
                     fillOpacity={0.25} 
                   />
                   <Radar 
                     name="Média Geral" 
                     dataKey="Média Geral" 
-                    stroke="#002D62" 
-                    fill="#002D62" 
+                    stroke="#19A1E6" 
+                    fill="#19A1E6" 
                     fillOpacity={0.15} 
                   />
                   <Tooltip />

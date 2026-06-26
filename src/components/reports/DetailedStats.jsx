@@ -19,19 +19,22 @@ export default function DetailedStats({ simulations }) {
     );
   }
 
+  const withEvaluation = simulations.filter(s => s.evaluation);
+
   const getAverageScore = (field) => {
-    return Math.round(simulations.reduce((acc, sim) => acc + sim.evaluation[field], 0) / simulations.length);
+    if (withEvaluation.length === 0) return 0;
+    return Math.round(withEvaluation.reduce((acc, sim) => acc + (sim.evaluation?.[field] ?? 0), 0) / withEvaluation.length);
   };
 
   const getTrend = (field) => {
-    if (simulations.length < 2) return 0;
-    const recent = simulations.slice(-3);
-    const older = simulations.slice(-6, -3);
+    if (withEvaluation.length < 2) return 0;
+    const recent = withEvaluation.slice(-3);
+    const older = withEvaluation.slice(-6, -3);
     
     if (older.length === 0) return 0;
     
-    const recentAvg = recent.reduce((acc, sim) => acc + sim.evaluation[field], 0) / recent.length;
-    const olderAvg = older.reduce((acc, sim) => acc + sim.evaluation[field], 0) / older.length;
+    const recentAvg = recent.reduce((acc, sim) => acc + (sim.evaluation?.[field] ?? 0), 0) / recent.length;
+    const olderAvg = older.reduce((acc, sim) => acc + (sim.evaluation?.[field] ?? 0), 0) / older.length;
     
     return recentAvg - olderAvg;
   };
