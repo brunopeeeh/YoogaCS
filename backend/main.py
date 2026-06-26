@@ -4,6 +4,7 @@ import random
 import asyncio
 import time
 import re
+import functools
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Request
@@ -128,6 +129,34 @@ else:
 
 # Caminho para os embeddings do FAQ
 FAQ_PATH = os.path.join(os.path.dirname(__file__), "..", "src", "data", "faq-embeddings.json")
+
+# Caminho para o documento mãe do sistema Yooga
+_SYSTEM_DIR = os.path.join(os.path.dirname(__file__), "..", "src", "data", "knowledge-base", "_system")
+
+def _load_md(filename: str) -> str:
+    """Lê um .md de _system/, remove frontmatter e cacheia via lru_cache."""
+    path = os.path.join(_SYSTEM_DIR, filename)
+    try:
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                content = parts[2].strip()
+        return content
+    except Exception as exc:
+        print(f"[Core Context] Aviso: {filename} não encontrado: {exc}")
+        return ""
+
+@functools.lru_cache(maxsize=1)
+def get_client_context() -> str:
+    """Contexto do cliente Yooga — injeta apenas no /simulate."""
+    return _load_md("yooga-client-context.md")
+
+@functools.lru_cache(maxsize=1)
+def get_agent_context() -> str:
+    """Contexto do agente CS — injeta em /coach, /audit e /scenarios."""
+    return _load_md("yooga-agent-context.md")
 
 # Modelos do Gemini para rotação automática contra limites de cota (429)
 MODEL_CHAIN = [
@@ -728,6 +757,9 @@ async def simulate_chat(req: SimulateRequest):
     2. Se o atendente der respostas vagas, genéricas, incompletas ou incorretas, demonstre frustração de acordo com seu perfil (continue reclamando, diga que não funcionou ou peça clareza).
     3. Responda em português brasileiro coloquial, de forma direta e curta (evite parágrafos longos e robóticos). Nunca se comporte como uma inteligência artificial ou assistente.
     """
+    _ctx = get_client_context()
+    if _ctx:
+        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
 
     # Mapear o histórico de mensagens ativamente para papéis estruturados nativos (agent -> user, client -> assistant)
     chat_messages = []
@@ -783,6 +815,9 @@ async def coach_assistant(req: CoachRequest):
 
     Retorne a resposta estritamente formatada no JSON requerido.
     """
+    _ctx = get_agent_context()
+    if _ctx:
+        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
 
     chat_history_str = ""
     for msg in req.history:
@@ -870,6 +905,9 @@ async def audit_chat(req: AuditRequest):
 
     Se houver interações, faça uma análise criteriosa e realista. Seja honesto e não dê notas infladas (uma nota 100 deve ser extremamente rara e perfeita).
     """
+    _ctx = get_agent_context()
+    if _ctx:
+        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
 
     chat_history_str = ""
     for msg in req.history:
@@ -972,6 +1010,9 @@ async def generate_scenario(req: GenerateScenarioRequest):
     
     Retorne APENAS um objeto JSON válido conforme o schema solicitado, em português brasileiro.
     """
+    _ctx = get_agent_context()
+    if _ctx:
+        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
 
     parsed_json = await asyncio.to_thread(invoke_llm_json, req.prompt, schema, system_instruction)
 
