@@ -41,3 +41,6 @@ backend/.venv/
 # Test reports and results
 playwright-report/
 test-results/
+
+# Contexto IA local (não versionar — diretrizes internas de simulação)
+src/data/knowledge-base/_system/
