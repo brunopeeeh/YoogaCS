@@ -276,6 +276,45 @@ async function run() {
     }
   }
 
+  // ─── Processar documentos _system/ (sempre injetados no RAG) ────────────────
+  const systemDir = path.resolve(process.cwd(), 'src/data/knowledge-base/_system');
+  if (fs.existsSync(systemDir)) {
+    const systemFiles = fs.readdirSync(systemDir).filter(f => f.endsWith('.md'));
+    console.log(`\n=== Processando ${systemFiles.length} documento(s) _system/ ===`);
+    for (const filename of systemFiles) {
+      const filePath = path.join(systemDir, filename);
+      let raw = fs.readFileSync(filePath, 'utf-8');
+
+      // Strip frontmatter YAML
+      if (raw.startsWith('---')) {
+        const parts = raw.split('---');
+        if (parts.length >= 3) raw = parts.slice(2).join('---').trim();
+      }
+
+      const slug = filename.replace('.md', '');
+      const chunks = createChunks(raw);
+      console.log(`-> "${filename}": ${chunks.length} fragmento(s)`);
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkText = chunks[i];
+        const textToEmbed = `[Sistema Yooga: ${slug}]\n${chunkText}`;
+        console.log(`   * Gerando embedding para fragmento ${i + 1}/${chunks.length}...`);
+        const embedding = await generateEmbedding(textToEmbed);
+        if (embedding) {
+          processedData.push({
+            id: `_system-${slug}-part-${i}`,
+            title: `Sistema Yooga — ${slug}`,
+            faqUrl: 'https://yooga.com.br/wiki',
+            content: chunkText,
+            embedding,
+          });
+        }
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // Garantir que a pasta destino existe
   const outputDir = path.resolve(process.cwd(), 'src/data');
   if (!fs.existsSync(outputDir)) {
