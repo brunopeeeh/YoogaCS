@@ -1,0 +1,23 @@
+---
+title: "Relatório Acréscimo"
+category: "Painel De Relatorios"
+source: "https://www.notion.so/Relat-rio-Acr-scimo-24300ee50e908107a0a9c51ac454c21a"
+scraped_at: "2026-05-22T10:54:40.806Z"
+---
+
+# Relatório Acréscimo
+
+O relatório de acréscimo está disponível em **Relatórios > Relatório Acréscimo **no painel de relatórios.
+
+👉 **Config
+## 😎Como funciona
+
+O relatório de acréscimo trará quais vendas foram realizadas no período filtrado, o valor de acréscimo e a porcentagem desse acréscimo sobre a venda. Ao final do relatório será possível visualizar a soma total de vendas, descontos e acréscimos no período filtrado.
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/16791db1-3e65-4b77-bf08-77eada3c90f3/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466ZXOTME4Y%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T105434Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIAQ4qureaA2SBUSt3C%2BBSjZ1H%2BybCXIIT5IUWBsaEUV7AiEAjoxTCNS46YJi9KzcdWLOMboAQgkrtLjJz8x1xMqievYq%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDL18eEPDMuxypp0SjyrcA1zLMqsdBCanYFUyGRWqwODLX0jTwNZjZZlKaq%2FudzPE90T7ZkIzypA0bXyzKFqvVKXDtaTWsKeUlWnv2UJstqINnakcn9NNJTVtyq5%2FtQSdd0AsDWKUjqQpdpfJcZVNNH%2F9H6AJz8VL8ie1KBQB%2FQ6QaF%2BYYmvHTcRFEGZgyZLd9%2BLcw8DM6V962mszUT7zHU5aX0kYKf1rVvZhyPK1hElD1cOoGhLAzYF83XX2tqJcwmw1VTHoEg3tULSyrqd88APKkOO%2BAf0mWVJsInAyuwtoORqWR4mVEQe%2F9hiwFNOrlS95tA%2Fm52kwoDpDBZKcukoXEukuSvOjxnSs3EtHGZ7gIolODElgyMdllU%2BzpJIMSPEhY9%2BBBpb8PKc1m9IQe49TP03TtIpX%2BXpNws7Gpx3OLruqeSDKqzHhEDm0krt9sqDC8Pm6rgI1MR3kjHhY5UDubhpPlVZSX57uRXm3LNcv0BQE61JeFa5uVwM8FQ5pTHmrXXN9vRUTsdLMZ0Nz8yRYXJq%2FNdEvJQbPSAA8g3R%2FmNNpDA91PRQs9UkCn3ONHNzVJz%2BsH66xY5K6vFjGjFVGrV7ZuWy%2BEZ%2Bm8IaOzMa48aEORyUC8L5qfYVpKSmYOUvOB2ku8JjgvFvNMMLAwNAGOqUBpP7KwIGHGVffhBQla7sIRUeqYvgbuRfFGBsjZ3DNdiLCDaaBBQuTtO3DlpEdeRRoA61vAGJBfPK9KobYRHrAWqFG1xoyKUX44nfNbxy41ZdRDkdtnhN9by2IvyI7ODnG%2FeluMoy8LqAHNVqooAj4%2B6pmeDHqHdvlFNd8c%2FgSVPEsuR2aLL3XNPKe0dQH5o5dz0HEhkx%2Bg62dbG6e%2Fsx1r%2BpGB5Qr&X-Amz-Signature=1c580c71a05a13083a150e7405de526d2d76f3fd952e572391ce7e6ab6394c0d&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+Também é possível filtrar por vendedores específicos e tipos de vendas, como todas exceto delivery, todas exceto Ifood e somente Ifood.
+
+![Imagem](https://prod-files-secure.s3.us-west-2.amazonaws.com/4f800ee5-0e90-8129-aba9-000315287451/1a135fbc-7a30-4498-8bd8-20ad1eac2437/Untitled.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466ZXOTME4Y%2F20260522%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20260522T105434Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEFIaCXVzLXdlc3QtMiJHMEUCIAQ4qureaA2SBUSt3C%2BBSjZ1H%2BybCXIIT5IUWBsaEUV7AiEAjoxTCNS46YJi9KzcdWLOMboAQgkrtLjJz8x1xMqievYq%2FwMIGhAAGgw2Mzc0MjMxODM4MDUiDL18eEPDMuxypp0SjyrcA1zLMqsdBCanYFUyGRWqwODLX0jTwNZjZZlKaq%2FudzPE90T7ZkIzypA0bXyzKFqvVKXDtaTWsKeUlWnv2UJstqINnakcn9NNJTVtyq5%2FtQSdd0AsDWKUjqQpdpfJcZVNNH%2F9H6AJz8VL8ie1KBQB%2FQ6QaF%2BYYmvHTcRFEGZgyZLd9%2BLcw8DM6V962mszUT7zHU5aX0kYKf1rVvZhyPK1hElD1cOoGhLAzYF83XX2tqJcwmw1VTHoEg3tULSyrqd88APKkOO%2BAf0mWVJsInAyuwtoORqWR4mVEQe%2F9hiwFNOrlS95tA%2Fm52kwoDpDBZKcukoXEukuSvOjxnSs3EtHGZ7gIolODElgyMdllU%2BzpJIMSPEhY9%2BBBpb8PKc1m9IQe49TP03TtIpX%2BXpNws7Gpx3OLruqeSDKqzHhEDm0krt9sqDC8Pm6rgI1MR3kjHhY5UDubhpPlVZSX57uRXm3LNcv0BQE61JeFa5uVwM8FQ5pTHmrXXN9vRUTsdLMZ0Nz8yRYXJq%2FNdEvJQbPSAA8g3R%2FmNNpDA91PRQs9UkCn3ONHNzVJz%2BsH66xY5K6vFjGjFVGrV7ZuWy%2BEZ%2Bm8IaOzMa48aEORyUC8L5qfYVpKSmYOUvOB2ku8JjgvFvNMMLAwNAGOqUBpP7KwIGHGVffhBQla7sIRUeqYvgbuRfFGBsjZ3DNdiLCDaaBBQuTtO3DlpEdeRRoA61vAGJBfPK9KobYRHrAWqFG1xoyKUX44nfNbxy41ZdRDkdtnhN9by2IvyI7ODnG%2FeluMoy8LqAHNVqooAj4%2B6pmeDHqHdvlFNd8c%2FgSVPEsuR2aLL3XNPKe0dQH5o5dz0HEhkx%2Bg62dbG6e%2Fsx1r%2BpGB5Qr&X-Amz-Signature=c30f3eadbf47b6a85207ca0060c37fb46afdb8e4c92cff026c247ba31baed199&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject)
+
+## 📝 Tag para finalizar o chat
