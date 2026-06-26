@@ -73,14 +73,14 @@ export default function Dashboard() {
   // Optionally, show a loading state for the entire dashboard while user is loading
   if (isUserLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-yooga-primary/5">
         <p className="text-xl text-slate-700">Carregando usuário...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -100,7 +100,7 @@ export default function Dashboard() {
               </Button>
             </Link>
             <Link to={createPageUrl("Simulator")}>
-              <Button className="bg-[#002D62] hover:bg-[#004094] gap-2 h-12 px-6 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold rounded-xl">
+              <Button className="bg-primary hover:bg-yooga-primary-dark gap-2 h-12 px-6 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold rounded-xl">
                 <MessageSquare className="w-5 h-5" />
                 Nova Simulação
               </Button>
@@ -114,7 +114,7 @@ export default function Dashboard() {
             title="Cenários Disponíveis"
             value={stats.totalScenarios}
             icon={BookOpen}
-            gradient="from-blue-500 to-blue-600"
+            gradient="from-primary to-yooga-primary-light"
             description="Cenários para treinar"
           />
           <StatsOverview 
@@ -128,7 +128,7 @@ export default function Dashboard() {
             title="Taxa de Conclusão"
             value={`${stats.totalSimulations > 0 ? Math.round((stats.completedSimulations / stats.totalSimulations) * 100) : 0}%`}
             icon={Award}
-            gradient="from-[#002D62] to-[#004094]"
+            gradient="from-primary to-yooga-primary-dark"
             description="Simulações finalizadas"
           />
           <StatsOverview 

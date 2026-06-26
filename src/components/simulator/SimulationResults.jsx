@@ -18,6 +18,21 @@ import {
 } from "lucide-react";
 
 export default function SimulationResults({ results, scenario, onRestart, maxSuggestions }) {
+  if (!results?.evaluation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6 flex items-center justify-center">
+        <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 p-8 text-center max-w-md">
+          <CardTitle className="mb-4">Avaliação Indisponível</CardTitle>
+          <p className="text-slate-600 mb-6">Não foi possível carregar os resultados da simulação. Tente novamente.</p>
+          <Button onClick={onRestart} className="gap-2 h-12 px-6 cursor-pointer">
+            <RotateCcw className="w-5 h-5" />
+            Nova Simulação
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   const evaluation = results.evaluation;
   
   const getScoreColor = (score) => {
@@ -61,7 +76,7 @@ export default function SimulationResults({ results, scenario, onRestart, maxSug
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
@@ -154,7 +169,7 @@ export default function SimulationResults({ results, scenario, onRestart, maxSug
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60">
             <CardContent className="flex items-center gap-3 pt-6">
-              <Clock className="w-8 h-8 text-blue-600" />
+              <Clock className="w-8 h-8 text-primary" />
               <div>
                 <p className="text-sm text-slate-600">Duração</p>
                 <p className="text-xl font-bold">{results.duration_minutes || 0} min</p>
@@ -184,7 +199,7 @@ export default function SimulationResults({ results, scenario, onRestart, maxSug
 
           <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60">
             <CardContent className="flex items-center gap-3 pt-6">
-              <TrendingUp className="w-8 h-8 text-[#FF6600]" />
+              <TrendingUp className="w-8 h-8 text-yooga-accent" />
               <div>
                 <p className="text-sm text-slate-600">Cenário</p>
                 <p className="text-sm font-semibold">{scenario.difficulty_level}</p>
@@ -260,7 +275,7 @@ export default function SimulationResults({ results, scenario, onRestart, maxSug
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button
             onClick={onRestart}
-            className="bg-gradient-to-r from-[#002D62] to-[#004094] hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 gap-2 h-12 px-6 cursor-pointer"
+            className="bg-gradient-to-r from-primary to-yooga-primary-dark hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 gap-2 h-12 px-6 cursor-pointer"
           >
             <RotateCcw className="w-5 h-5" />
             Nova Simulação

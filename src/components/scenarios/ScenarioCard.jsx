@@ -118,7 +118,7 @@ export default function ScenarioCard({ scenario, onEdit, onDelete }) {
               <Link to={`${createPageUrl("Simulator")}?scenario=${scenario.id}`} className="flex-1 min-w-[90px]">
                 <Button 
                   size="sm" 
-                  className="w-full gap-1 h-9 bg-gradient-to-r from-[#002D62] to-[#004094] hover:opacity-95 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer text-white rounded-lg font-bold"
+                  className="w-full gap-1 h-9 bg-gradient-to-r from-primary to-yooga-primary-dark hover:opacity-95 hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer text-white rounded-lg font-bold"
                 >
                   <Play className="w-3.5 h-3.5" />
                   Praticar

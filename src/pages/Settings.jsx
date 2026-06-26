@@ -48,14 +48,14 @@ export default function Settings() {
   
   if (isLoading) {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6 flex items-center justify-center" role="status" aria-live="polite">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
         </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -70,7 +70,7 @@ export default function Settings() {
           <Button
             onClick={handleSave}
             disabled={isSaving}
-            className="bg-[#002D62] hover:bg-[#004094] gap-2 h-12 px-6 shadow-lg rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold"
+            className="bg-primary hover:bg-yooga-primary-dark gap-2 h-12 px-6 shadow-lg rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold"
           >
             <Save className="w-5 h-5" />
             {isSaving ? "Salvando..." : "Salvar Alterações"}

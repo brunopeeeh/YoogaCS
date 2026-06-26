@@ -3,6 +3,31 @@ import json
 import math
 from typing import List, Dict, Any
 
+# Cache em memória do arquivo JSON de embeddings (evita reler 27MB do disco a cada request)
+_faq_cache: Any = None
+_faq_cache_mtime: float = 0
+_faq_cache_miss: bool = False
+
+def _load_faq_data(faq_path: str):
+    global _faq_cache, _faq_cache_mtime, _faq_cache_miss
+    if _faq_cache_miss:
+        return None
+    try:
+        if not os.path.exists(faq_path):
+            _faq_cache_miss = True
+            print(f"[RAG Engine] Aviso: Base vetorial não encontrada em: {faq_path}")
+            return None
+        current_mtime = os.path.getmtime(faq_path)
+        if _faq_cache is not None and current_mtime <= _faq_cache_mtime:
+            return _faq_cache
+        with open(faq_path, "r", encoding="utf-8") as f:
+            _faq_cache = json.load(f)
+            _faq_cache_mtime = current_mtime
+    except Exception as e:
+        print(f"[RAG Engine] Erro ao carregar base vetorial: {e}")
+        _faq_cache_miss = True
+        return None
+
 # Palavras-chave críticas para boosting semântico
 KEYWORD_BOOSTS = [
     "offline", "contingencia", "navegador", "sincroniz", "ifood", "cardapio", 
@@ -78,14 +103,8 @@ def _get_semantic_faq_context_local(query: str, faq_path: str) -> str:
     if len(clean_query) < 4 or (clean_query in greetings and "problema" not in clean_query and "erro" not in clean_query):
         return ""
         
-    if not os.path.exists(faq_path):
-        print(f"[RAG Engine] Aviso: Base vetorial não encontrada em: {faq_path}")
-        return ""
-        
     try:
-        with open(faq_path, "r", encoding="utf-8") as f:
-            faq_data = json.load(f)
-            
+        faq_data = _load_faq_data(faq_path)
         if not isinstance(faq_data, list) or len(faq_data) == 0:
             return ""
             

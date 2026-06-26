@@ -2,12 +2,12 @@
  * integrations/Core - substitui a ponte de comunicação do simulador.
  *
  * Se comunica com o backend em Python (FastAPI) rodando localmente na porta 8000.
- * Caso o servidor backend esteja inacessível ou offline, realiza a degradação suave
- * (graceful degradation) acionando o RAG local-first e os fallbacks em JavaScript.
+ * Caso o servidor backend esteja inacessível ou offline, retorna contexto vazio.
+ * A busca vetorial RAG é feita exclusivamente no backend (Supabase pgvector → JSON local).
  */
 
 import { Message } from "../types";
-import { loadFaqEmbeddings } from "../data/load-faq-embeddings";
+
 
 const BACKEND_URL = "http://localhost:8000";
 // @ts-ignore
@@ -21,6 +21,14 @@ interface InvokeLLMProps {
   client_profile?: string;
   goals?: string[];
   scenario_title?: string;
+  initial_problem?: string;
+  scenario_context?: string;
+  expected_interactions?: number;
+  required_points_hint?: string;
+  faq_context?: string;
+  checklist_section?: string;
+  common_mistakes_section?: string;
+  scoring_rules_section?: string;
 }
 
 /**
@@ -34,7 +42,15 @@ export async function InvokeLLM({
   history = [],
   client_profile = "irritado",
   goals = [],
-  scenario_title = ""
+  scenario_title = "",
+  initial_problem = "",
+  scenario_context,
+  expected_interactions,
+  required_points_hint = "",
+  faq_context = "",
+  checklist_section = "",
+  common_mistakes_section = "",
+  scoring_rules_section = ""
 }: InvokeLLMProps): Promise<any> {
   const schemaProps = Object.keys(response_json_schema?.properties || {});
 
@@ -53,12 +69,12 @@ export async function InvokeLLM({
       body = { prompt, system_instruction, response_json_schema };
     } else if (isCoach) {
       endpoint = "/api/chat/coach";
-      body = { prompt, history, system_instruction };
+      body = { prompt, history, system_instruction, scenario_title, required_points_hint };
     } else if (isAudit) {
       endpoint = "/api/chat/audit";
-      body = { history, goals, scenario_title, system_instruction, prompt };
+      body = { history, goals, scenario_title, system_instruction, prompt, faq_context, checklist_section, common_mistakes_section, scoring_rules_section };
     } else {
-      body = { prompt, history, system_instruction, client_profile };
+      body = { prompt, history, system_instruction, client_profile, initial_problem, scenario_title, scenario_context, expected_interactions };
     }
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -204,6 +220,33 @@ export async function InvokeLLM({
 }
 
 /**
+ * Solicita uma mensagem de nudge (cobrança) quando o atendente demora para responder.
+ */
+export async function NudgeClient({ client_profile, history, scenario_title }: {
+  client_profile: string;
+  history: Message[];
+  scenario_title?: string;
+}): Promise<{ nudge: string | null; should_nudge: boolean }> {
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (BACKEND_API_KEY) {
+      headers["X-API-Key"] = BACKEND_API_KEY;
+    }
+    const res = await fetch(`${BACKEND_URL}/api/chat/simulate/nudge`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ client_profile, history, scenario_title })
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    console.warn("[Core Client] Nudge endpoint indisponível.");
+  }
+  return { nudge: null, should_nudge: false };
+}
+
+/**
  * Converte arquivos para base64.
  */
 export async function UploadFile({ file }: { file: File }): Promise<{ file_url: string }> {
@@ -283,29 +326,6 @@ function getSimulatedClientMessage(prompt: string, context: string, clientProfil
 
 // ─── RAG Local-First (Similaridade Cosseno / Produto Escalar) ──────────────────
 
-function generateDeterministicVector(text: string): number[] {
-  const vector: number[] = [];
-  const dim = 768;
-  
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    hash = (text.charCodeAt(i) + ((hash << 5) - hash)) | 0;
-  }
-  
-  for (let d = 0; d < dim; d++) {
-    const value = Math.sin(hash + d) * 0.1;
-    vector.push(value);
-  }
-  
-  const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
-  return magnitude === 0 ? vector : vector.map(val => val / magnitude);
-}
-
-function dotProduct(vecA: number[], vecB: number[]): number {
-  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
-  return vecA.reduce((sum, val, idx) => sum + val * vecB[idx], 0);
-}
-
 export async function GetSemanticFaqContext(promptText: string): Promise<string> {
   if (!promptText) return "";
 
@@ -315,8 +335,10 @@ export async function GetSemanticFaqContext(promptText: string): Promise<string>
     return "";
   }
 
-  // 1. Priorizar busca vetorial no backend (Supabase pgvector)
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (BACKEND_API_KEY) {
       headers["X-API-Key"] = BACKEND_API_KEY;
@@ -324,8 +346,11 @@ export async function GetSemanticFaqContext(promptText: string): Promise<string>
     const res = await fetch(`${BACKEND_URL}/api/rag/search`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ query: promptText })
+      body: JSON.stringify({ query: promptText }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
+
     if (res.ok) {
       const data = await res.json();
       if (data.context) {
@@ -334,90 +359,13 @@ export async function GetSemanticFaqContext(promptText: string): Promise<string>
       }
       return "";
     }
-  } catch {
-    console.warn("[Core Client] Backend RAG indisponível, usando fallback local.");
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.warn("[Core Client] RAG request timed out (10s) — backend indisponível");
+    } else {
+      console.warn("[Core Client] Backend RAG indisponível");
+    }
   }
 
-  // 2. Fallback local (JSON + sessionStorage)
-  try {
-    const faqEmbeddings = await loadFaqEmbeddings();
-    let allEmbeddings = Array.isArray(faqEmbeddings) ? [...faqEmbeddings] : [];
-    const mergedMap = new Map();
-    allEmbeddings.forEach(item => mergedMap.set(item.id, item));
-
-    if (typeof window !== "undefined") {
-      try {
-        const sessionData = window.sessionStorage.getItem("yooga_faq_embeddings_session") ||
-                            window.localStorage.getItem("yooga_faq_embeddings_session");
-        if (sessionData) {
-          const parsedSession = JSON.parse(sessionData);
-          if (Array.isArray(parsedSession)) {
-            parsedSession.forEach(item => mergedMap.set(item.id, item));
-          }
-        }
-      } catch {}
-
-      try {
-        const customData = window.localStorage.getItem("db_custom_embeddings");
-        if (customData) {
-          const parsedCustom = JSON.parse(customData);
-          if (Array.isArray(parsedCustom)) {
-            parsedCustom.forEach(item => mergedMap.set(item.id, item));
-          }
-        }
-      } catch {}
-    }
-
-    allEmbeddings = Array.from(mergedMap.values());
-    if (allEmbeddings.length === 0) return "";
-
-    const queryVector = generateDeterministicVector(cleanPrompt);
-    const matches = allEmbeddings.map((doc: any) => {
-      let similarity = dotProduct(queryVector, doc.embedding);
-      const docTitleLower = (doc.title || "").toLowerCase();
-      const docContentLower = (doc.content || "").toLowerCase();
-      
-      const keywords = [
-        "offline", "contingencia", "navegador", "sincroniz", "ifood", "cardapio", 
-        "nfce", "nfc-e", "csc", "sefaz", "contador", "impressora", "bobina", 
-        "margem", "pagamento", "dividir", "caixa", "senha", "cancelamento", "permissao"
-      ];
-
-      keywords.forEach(kw => {
-        if (cleanPrompt.includes(kw)) {
-          if (docTitleLower.includes(kw)) similarity += 0.08;
-          if (docContentLower.includes(kw)) similarity += 0.03;
-        }
-      });
-
-      return { ...doc, similarity };
-    });
-
-    matches.sort((a, b) => b.similarity - a.similarity);
-    const matchedDocs = matches.filter(m => m.similarity > 0.15);
-    if (matchedDocs.length === 0) return "";
-
-    const uniqueDocs = [];
-    const seenTitles = new Set();
-    for (const doc of matchedDocs) {
-      const normalizedTitle = (doc.title || "").trim().toLowerCase();
-      if (!seenTitles.has(normalizedTitle)) {
-        seenTitles.add(normalizedTitle);
-        uniqueDocs.push(doc);
-      }
-      if (uniqueDocs.length >= 3) break;
-    }
-
-    if (uniqueDocs.length === 0) return "";
-
-    const truncate = (text: string, max = 900) =>
-      text.length <= max ? text : `${text.slice(0, max - 3).trim()}...`;
-
-    return uniqueDocs
-      .map(doc => `[Artigo de Ajuda Yooga: "${doc.title}"]\nConteúdo: ${truncate(doc.content)}\nLink do Artigo: ${doc.faqUrl}`)
-      .join("\n\n");
-  } catch (error) {
-    console.error("[GetSemanticFaqContext] Erro ao buscar contexto semântico:", error);
-    return "";
-  }
+  return "";
 }

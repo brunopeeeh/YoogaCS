@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Scenario, Simulation, CompanyProfile, AgentPerformance } from "@/entities/all";
 import { useUser } from "../components/auth/UserProvider";
-import { InvokeLLM, GetSemanticFaqContext } from "@/integrations/Core";
+import { InvokeLLM, GetSemanticFaqContext, NudgeClient } from "@/integrations/Core";
 import { getKnowledgeForScenario, analyzeAgentCoverage } from "@/data/yooga-knowledge-base";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -19,6 +19,7 @@ import SuggestionModal from "../components/simulator/SuggestionModal";
 export default function Simulator() {
   const { user, isLoading: isUserLoading } = useUser();
   const [searchParams] = useSearchParams();
+  const deepLinkScenarioId = searchParams.get("scenario");
   const [scenarios, setScenarios] = useState([]);
   const [companyProfile, setCompanyProfile] = useState(null);
   const [selectedScenario, setSelectedScenario] = useState(null);
@@ -36,6 +37,7 @@ export default function Simulator() {
   const MAX_SUGGESTIONS = 2;
 
   const responseTimeoutRef = useRef(null);
+  const nudgeTimerRef = useRef(null);
   const pendingAgentMessagesRef = useRef([]);
   const messagesRef = useRef(messages);
 
@@ -46,6 +48,7 @@ export default function Simulator() {
   useEffect(() => {
     return () => {
       if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+      if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
     };
   }, []);
 
@@ -64,11 +67,10 @@ export default function Simulator() {
 
   // Deep link: ?scenario=<id>
   useEffect(() => {
-    const scenarioId = searchParams.get("scenario");
-    if (!scenarioId || scenarios.length === 0 || isSimulating) return;
-    const match = scenarios.find(s => s.id === scenarioId);
+    if (!deepLinkScenarioId || scenarios.length === 0 || isSimulating) return;
+    const match = scenarios.find(s => s.id === deepLinkScenarioId);
     if (match) setSelectedScenario(match);
-  }, [searchParams, scenarios, isSimulating]);
+  }, [deepLinkScenarioId, scenarios, isSimulating]);
 
   const loadInitialData = async () => {
     setIsLoadingData(true);
@@ -136,131 +138,20 @@ export default function Simulator() {
   };
 
   const generateClientResponse = async (agentMessage, messageHistory, scenario) => {
-    const file_urls = companyProfile?.knowledge_base_files?.map(f => f.url) || [];
-    const tone_of_voice = companyProfile?.tone_of_voice || "Padrão da Yooga: Disponibilidade (24h), Proatividade, Conhecimento Técnico, Empatia e Humor apropriado.";
-
-    // Simular comportamento sazonal
-    const currentHour = new Date().getHours();
-    const isPeakHour = currentHour >= 8 && currentHour <= 18;
-    const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-
-    // ═══ BASE DE CONHECIMENTO ESTRUTURADA (Prioridade 1) ═══
+    if (!scenario) return "Olá! Como posso ajudar?";
     const knowledgeBase = getKnowledgeForScenario(scenario.title);
-    let faqContext = "";
-    
-    if (knowledgeBase) {
-      faqContext = knowledgeBase.technicalContent;
-    } else {
-      // Fallback: RAG Semântico Local-First
-      try {
-        const queryText = agentMessage || scenario.initial_problem;
-        faqContext = await GetSemanticFaqContext(queryText);
-        
-        if (!faqContext && scenario.moduleId) {
-          const articles = await Article.filter({ moduleId: scenario.moduleId });
-          if (articles && articles.length > 0) {
-            faqContext = articles.map(a => `- Artigo: "${a.title}"\n  Conteúdo Técnico:\n  ${a.content}`).join("\n\n");
-          }
-        }
-      } catch (err) {
-        console.error("Erro ao buscar contexto RAG de FAQ:", err);
-      }
-    }
-
-    const agentInteractions = messageHistory.filter(m => m.sender === 'agent').length;
-    let forceEndingInstruction = "";
-
-    if (agentInteractions >= 1) {
-      const lowerAgentMsg = agentMessage ? agentMessage.toLowerCase() : "";
-      
-      // Mapeamento de termos de validação técnica por cenário
-      const keywordsMap = {
-        "venda offline": ["salv", "navegador", "fech", "limp", "sincroniz", "off", "contingencia"],
-        "ifood": ["vinc", "categori", "sincroniz", "preço", "painel", "portal"],
-        "fiscal": ["csc", "sefaz", "produção", "certificado", "digital", "contador", "nfc"],
-        "nfc-e": ["csc", "sefaz", "produção", "certificado", "digital", "contador", "nfc"],
-        "impressora": ["largura", "bobina", "58mm", "margem", "margens", "horizontal"],
-        "pagamento": ["parcial", "adicionar", "dividir", "pix", "dinheiro", "fechamento"],
-        "segurança": ["cargo", "permissao", "senha", "cancelamento", "gerente", "administrador"],
-        "delivery": ["ajust", "configur", "habilit", "painel", "acompanh", "loja", "chat", "cliente"]
-      };
-
-      const titleLower = (scenario?.title || "").toLowerCase();
-      let keywords = ["ajuda", "suporte"];
-      for (const [key, list] of Object.entries(keywordsMap)) {
-        if (titleLower.includes(key)) {
-          keywords = list;
-          break;
-        }
-      }
-
-      const historyText = messageHistory.map(m => m.message.toLowerCase()).join(" ");
-      const hasTechnicalMention = keywords.some(kw => historyText.includes(kw) || lowerAgentMsg.includes(kw));
-      const hasEndingMention = ["obrigado", "tchau", "abraco", "tarde", "dia", "finalizar", "concluir", "ajudar em algo", "disposicao"].some(kw => lowerAgentMsg.includes(kw));
-
-      if (hasTechnicalMention || agentInteractions >= (scenario.expected_interactions || 4) - 1 || hasEndingMention) {
-        forceEndingInstruction = `
-[DIRETRIZ DE ENCERRAMENTO ABSOLUTO - CRÍTICO E OBRIGATÓRIO]:
-Você recebeu as orientações corretas baseadas na Central de Ajuda ou o atendimento está se aproximando do fim.
-Você deve demonstrar imenso alívio e satisfação com a resposta do atendente.
-Sua próxima resposta DEVE ser uma mensagem de agradecimento conclusiva e uma despedida amigável (ex: "Que alívio! Muito obrigado pela ajuda rápida, agora entendi tudo de verdade. Vou fazer exatamente esse passo a passo! Um abraço e boa semana!").
-Você está terminantemente PROIBIDO de fazer novas reclamações, fingir que o erro continua ou estender o chat. Apenas se despeça.`;
-      }
-    }
-
-    let firstMessageInstruction = "";
-    if (messageHistory.length === 0) {
-      firstMessageInstruction = `
-[DIRETRIZ DE INÍCIO DE CHAT - CRÍTICA E ABSOLUTA]:
-Esta é a PRIMEIRA mensagem do chat.
-Você deve se comportar exatamente como um humano real iniciando um atendimento de suporte no WhatsApp:
-1. Mande APENAS uma saudação inicial extremamente curta e informal (ex: "Oi, boa noite!", "Opa, tudo bem? Tem alguém aí?", "Socorro!").
-2. Fica TERMINANTEMENTE PROIBIDO descrever, detalhar ou agrupar o seu problema técnico ("${scenario.initial_problem}") junto com a saudação na primeira mensagem. Não diga o que está acontecendo ainda!
-3. Envie apenas a saudação curta e espere o atendente de CS responder para só então começar a explicar o problema de forma progressiva.`;
-    }
-
-    const systemInstruction = `Você é um cliente real da Yooga no chat de suporte, conversando com o atendimento de Customer Success (CS).
-Seu perfil psicológico de cliente é: ${scenario.client_profile.toUpperCase()}.
-Aja estritamente conforme seu perfil psicológico:
-${getClientProfileInstructions(scenario.client_profile)}
-
-Você tem o seguinte problema inicial de suporte: "${scenario.initial_problem}".
-Abaixo está o FAQ técnico oficial da Yooga para sua referência. O atendente da Yooga precisa te passar orientações compatíveis com este FAQ para resolver seu problema:
-${faqContext}
-
-⚠️⚠️ DIRETRIZES CRÍTICAS DE CONVERSAÇÃO E INTERATIVIDADE (OBRIGATÓRIO):
-1. **Atendimento Progressivo (Estilo WhatsApp):** Conduza a conversa de forma extremamente gradual e natural. Faça apenas uma pergunta ou comentário curto por vez. Nunca agrupe múltiplas queixas ou explicações longas na mesma resposta. Sempre espere o atendente responder ou te fazer perguntas específicas antes de avançar para o próximo passo.
-2. **Foco e Reatividade Estrita:** Responda exclusivamente ao que o atendente acabou de te dizer na última mensagem. Aja como um ser humano real no chat, nunca como um assistente de IA.
-3. **Anti-Vazamento de Contexto (NÃO ANTECIPE):** Nunca mencione ou discuta partes da solução (como caminhos de menu, chaves de acesso, configurações) que o atendente ainda não tiver abordado ativamente. Se o atendente apenas te cumprimentou ou fez uma pergunta inicial genérica, reaja de forma natural, simples e informal de acordo com o seu perfil, sem adivinhar a solução antes da hora.
-4. **Respostas Curtas e Realistas:** Mantenha suas mensagens curtas (no máximo 2 ou 3 frases curtas por mensagem). Use abreviações comuns de chat em português (como "vc", "tb", "obg", "tá", "pra") de forma natural.
-5. **Envio Consecutivo (Double Texting):** Sempre que fizer sentido para dar dinamismo, divida a sua mensagem em duas partes usando o delimitador "||" para simular o envio de mensagens consecutivas (ex: "Nossa, que dor de cabeça! || Pior que meu restaurante tá cheio...").
-
-⚠️⚠️ RECONHECIMENTO DE SOLUÇÃO E ENCERRAMENTO (OBRIGATÓRIO):
-Avalie a última mensagem enviada pelo atendente de CS:
-- Se a resposta dele contiver as orientações corretas, os passos operacionais ou caminhos de menu equivalentes aos descritos no FAQ oficial fornecido acima, você DEVE aceitar a solução imediatamente.
-- Fica proibido continuar teimoso, fingir que não funcionou ou fazer novas perguntas capciosas quando a instrução correta do FAQ já tiver sido repassada com clareza e empatia.
-- Responda demonstrando alívio e satisfação, confirme o entendimento e despeça-se de forma amigável (ex: "Que ótimo! Muito obrigado pela ajuda rápida, agora entendi tudo de verdade. Vou fazer exatamente esse passo a passo. Um abraço e boa semana!").
-${forceEndingInstruction}
-${firstMessageInstruction}`;
-
-    const prompt = `
-Histórico de Conversa até o momento:
-${messageHistory.length === 0 ? "Nenhuma mensagem trocada ainda. Inicie a conversa explicando o seu problema de forma natural." : messageHistory.map(m => `${m.sender === 'agent' ? 'AGENTE DE CS' : 'CLIENTE (VOCÊ)'}: ${m.message}`).join('\n')}
-
-${messageHistory.length > 0 ? `Última mensagem do Agente de CS: "${agentMessage}"` : ""}
-
-Abaixo está o seu contexto temporal:
-- ${isPeakHour ? "Horário comercial de pico! Seu restaurante está cheio e você tem pressa." : "Horário tranquilo de baixo movimento."}
-- ${isWeekend ? "Fim de semana! O movimento está intenso e você está tenso com o problema." : "Dia útil comum."}
-
-Gere sua próxima resposta curta como o cliente Yooga no chat.`;
+    const scenarioContext = scenario.context || knowledgeBase?.defaultContext || null;
 
     try {
       const response = await InvokeLLM({
         prompt: agentMessage || "",
-        system_instruction: systemInstruction,
         history: messageHistory.slice(0, -1).map(m => ({ sender: m.sender, message: m.message })),
         client_profile: scenario.client_profile,
+        initial_problem: scenario.initial_problem,
+        scenario_title: scenario.title,
+        scenario_context: scenarioContext,
+        expected_interactions: scenario.expected_interactions || 4,
+        response_json_schema: {} // Empty schema = simulate endpoint
       });
       return response;
     } catch (error) {
@@ -269,47 +160,34 @@ Gere sua próxima resposta curta como o cliente Yooga no chat.`;
     }
   };
 
-  const getClientProfileInstructions = (profile) => {
-    const instructions = {
-      irritado: "Demonstre frustração, seja direto, pode usar linguagem mais incisiva. Questione prazos e eficiência. Escalará rapidamente se não for bem atendido.",
-      confuso: "Faça muitas perguntas, peça esclarecimentos, demonstre dificuldade em entender processos técnicos. Seja hesitante.",
-      objetivo: "Seja direto, pragmático, focado na solução. Quer respostas rápidas e claras. Pode fazer perguntas técnicas específicas.",
-      indeciso: "Demonstre incerteza, mude de opinião, peça múltiplas opções. Pode voltar atrás em decisões.",
-      emotivo: "Use emojis, seja expressivo, demonstre gratidão quando bem atendido. Pode ficar mais sensível com problemas.",
-      impaciente: "Pressione por rapidez, mencione pressa, pode interromper explicações longas. 'Preciso resolver isso agora!'",
-      detalhista: "Faça perguntas específicas, queira entender processos completos, peça documentação ou passos detalhados."
-    };
-    return instructions[profile] || "Seja natural e realista conforme seu perfil de cliente.";
-  };
-
   const sendMessage = async (messageText) => {
     if (!messageText.trim() || !currentSimulation) return;
 
-    // Adicionar imediatamente a mensagem do atendente ao chat para exibição instantânea
     const agentMessage = {
       sender: "agent",
       message: messageText.trim(),
       timestamp: new Date().toISOString()
     };
 
-    const updatedMessages = [...messagesRef.current, agentMessage];
+    // Acumula mensagens no ref para evitar race condition entre chamadas rápidas
+    const updatedMessages = [...(messagesRef.current || []), agentMessage];
+    messagesRef.current = updatedMessages;
     setMessages(updatedMessages);
     pendingAgentMessagesRef.current.push(messageText.trim());
 
-    try {
-      await Simulation.update(currentSimulation.id, {
-        messages: updatedMessages
-      });
-    } catch (error) {
-      console.error("Erro ao sincronizar mensagem do agente no banco:", error);
-    }
+    // Fire-and-forget para não bloquear chamadas consecutivas do usuário
+    Simulation.update(currentSimulation.id, { messages: updatedMessages })
+      .catch(err => console.error("Erro ao sincronizar mensagem:", err));
 
-    // Limpar o timeout anterior se o atendente continuar enviando mensagens consecutivas
+    // Limpar timers anteriores se o atendente continuar enviando mensagens consecutivas
     if (responseTimeoutRef.current) {
       clearTimeout(responseTimeoutRef.current);
     }
+    if (nudgeTimerRef.current) {
+      clearTimeout(nudgeTimerRef.current);
+    }
 
-    // Debounce de 2 segundos para rodar a resposta da IA (WhatsApp Dynamics)
+    // Debounce de 12 segundos para rodar a resposta da IA (WhatsApp Dynamics - mais tempo para o analista digitar em sequência)
     responseTimeoutRef.current = setTimeout(async () => {
       setIsLoading(true);
 
@@ -326,7 +204,7 @@ Gere sua próxima resposta curta como o cliente Yooga no chat.`;
         let currentList = [...messagesRef.current];
 
         for (let i = 0; i < parts.length; i++) {
-          // Simular delay de digitação dinâmico para a segunda mensagem consecutiva do cliente
+          // Delay de digitação dinâmico para segunda mensagem consecutiva do cliente
           if (i > 0) {
             setIsLoading(true);
             const delay = Math.min(2500, Math.max(1000, parts[i].length * 35));
@@ -346,65 +224,92 @@ Gere sua próxima resposta curta como o cliente Yooga no chat.`;
             messages: currentList
           });
         }
+
+        // Iniciar timer de nudge (20s) para perfis impacientes/irritados
+        nudgeTimerRef.current = setTimeout(async () => {
+          try {
+            const result = await NudgeClient({
+              client_profile: selectedScenario.client_profile,
+              history: messagesRef.current.map(m => ({ sender: m.sender, message: m.message })),
+              scenario_title: selectedScenario.title
+            });
+            if (result.should_nudge && result.nudge) {
+              const nudgeMessage = {
+                sender: "client",
+                message: result.nudge,
+                timestamp: new Date().toISOString()
+              };
+              const updatedList = [...messagesRef.current, nudgeMessage];
+              setMessages(updatedList);
+              await Simulation.update(currentSimulation.id, { messages: updatedList });
+            }
+          } catch (err) {
+            console.warn("Nudge timer error:", err);
+          }
+        }, 60000);
+
       } catch (error) {
         console.error("Erro ao gerar resposta do cliente:", error);
       } finally {
         setIsLoading(false);
       }
-    }, 2000);
+    }, 12000);
+  };
+
+  const handleAgentTyping = () => {
+    // Se não há simulação em andamento ou a IA está pensando/processando, ignora
+    if (!currentSimulation || isLoading) return;
+
+    // Se o timer de nudge está ativo, vamos reiniciá-lo por mais 60 segundos
+    if (nudgeTimerRef.current) {
+      clearTimeout(nudgeTimerRef.current);
+    }
+    
+    // Só reagendar se a última mensagem no chat for do cliente
+    const lastMsg = messagesRef.current[messagesRef.current.length - 1];
+    if (lastMsg && lastMsg.sender === "client") {
+      nudgeTimerRef.current = setTimeout(async () => {
+        try {
+          const result = await NudgeClient({
+            client_profile: selectedScenario.client_profile,
+            history: messagesRef.current.map(m => ({ sender: m.sender, message: m.message })),
+            scenario_title: selectedScenario.title
+          });
+          if (result.should_nudge && result.nudge) {
+            const nudgeMessage = {
+              sender: "client",
+              message: result.nudge,
+              timestamp: new Date().toISOString()
+            };
+            const updatedList = [...messagesRef.current, nudgeMessage];
+            setMessages(updatedList);
+            await Simulation.update(currentSimulation.id, { messages: updatedList });
+          }
+        } catch (err) {
+          console.warn("Nudge timer error:", err);
+        }
+      }, 60000);
+    }
   };
 
   const handleRequestSuggestion = async () => {
-    if (suggestionsUsed >= MAX_SUGGESTIONS || isLoading) return;
+    if (suggestionsUsed >= MAX_SUGGESTIONS || isLoading || !selectedScenario) return;
 
     setIsLoading(true);
     
-    const file_urls = companyProfile?.knowledge_base_files?.map(f => f.url) || [];
     const tone_of_voice = companyProfile?.tone_of_voice || "Padrão da Yooga: Disponibilidade (24h), Proatividade, Conhecimento Técnico, Empatia e Humor apropriado.";
 
-    // ═══ BASE DE CONHECIMENTO ESTRUTURADA PARA SUGESTÃO ═══
     const knowledgeBase = getKnowledgeForScenario(selectedScenario.title);
-    let faqContext = "";
     let requiredPointsHint = "";
     
     if (knowledgeBase) {
-      faqContext = knowledgeBase.technicalContent;
-      // Informar ao Coach quais pontos o agente AINDA NÃO cobriu
       const coverage = analyzeAgentCoverage(messages, knowledgeBase.requiredPoints);
       if (coverage.missing.length > 0) {
         requiredPointsHint = `\n\nPONTOS QUE O AGENTE AINDA NÃO COBRIU (a sugestão DEVE incluir esses pontos):\n${coverage.missing.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
       }
-    } else {
-      try {
-        const lastClientMessage = messages.length > 0 ? messages[messages.length - 1].message : selectedScenario.initial_problem;
-        faqContext = await GetSemanticFaqContext(lastClientMessage);
-        if (!faqContext && selectedScenario.moduleId) {
-          const articles = await Article.filter({ moduleId: selectedScenario.moduleId });
-          if (articles && articles.length > 0) {
-            faqContext = articles.map(a => `- Artigo: "${a.title}"\n  Conteúdo Técnico:\n  ${a.content}`).join("\n\n");
-          }
-        }
-      } catch (err) {
-        console.error("Erro ao buscar contexto RAG para sugestão:", err);
-      }
     }
 
-    const systemInstruction = `Você é um Coach Sênior e Líder de Customer Success na Yooga.
-Sua missão é dar a melhor sugestão de resposta para um agente em treinamento que está no chat com um cliente Yooga.
-Sua resposta e direcionamento devem focar estritamente nas 5 Regras de Ouro (Pilares) de CS da Yooga:
-1. Disponibilidade
-2. Proatividade
-3. Conhecimento Técnico (baseado nos manuais/FAQ da Yooga)
-4. Empatia
-5. Humor apropriado
-
-Abaixo está o conteúdo técnico oficial da Yooga para este cenário. Sugira instruções que guiem o agente a repassar essas orientações perfeitamente:
-${faqContext}
-${requiredPointsHint}
-
-Responda APENAS com um objeto JSON válido contendo duas chaves:
-- "suggested_response": O texto exato da resposta ideal em português que o agente de CS deve copiar e colar para o cliente. Use um tom empático, proativo, claro e contendo as instruções corretas do FAQ Yooga.
-- "reasoning": A justificativa do porquê essa resposta é perfeita, detalhando quais pilares da Yooga ela cumpre e qual instrução técnica do FAQ ela aplica.`;
+    const lastMessage = messages.length > 0 ? messages[messages.length - 1].message : "Nenhuma mensagem ainda.";
 
     const prompt = `
 Cenário de Atendimento: "${selectedScenario.title}"
@@ -414,15 +319,16 @@ Diretrizes de Tom da Empresa: "${tone_of_voice}"
 Conversa atual:
 ${messages.map(m => `${m.sender === 'agent' ? 'AGENTE EM TREINAMENTO' : 'CLIENTE'}: ${m.message}`).join('\n')}
 
-Última mensagem do cliente: "${messages[messages.length - 1].message}"
+Última mensagem do cliente: "${lastMessage}"
 
 Forneça o objeto JSON com "suggested_response" e "reasoning" em português.`;
 
     try {
       const response = await InvokeLLM({
         prompt: prompt,
-        system_instruction: systemInstruction,
         history: messages.map(m => ({ sender: m.sender, message: m.message })),
+        scenario_title: selectedScenario.title,
+        required_points_hint: requiredPointsHint,
         response_json_schema: {
           type: "object",
           properties: {
@@ -495,10 +401,20 @@ Forneça o objeto JSON com "suggested_response" e "reasoning" em português.`;
   };
 
   const generateEvaluation = async () => {
-    const file_urls = companyProfile?.knowledge_base_files?.map(f => f.url) || [];
-    const tone_of_voice = companyProfile?.tone_of_voice || "Padrão da Yooga: Disponibilidade (24h), Proatividade, Conhecimento Técnico, Empatia e Humor apropriado.";
-
-    // ═══ BASE DE CONHECIMENTO ESTRUTURADA PARA AVALIAÇÃO ═══
+    if (!selectedScenario) {
+      return {
+        overall_score: 50,
+        empathy_score: 50,
+        resolution_score: 50,
+        professionalism_score: 50,
+        agility_score: 50,
+        feedback: "Cenário não disponível para avaliação.",
+        strengths: [],
+        improvements: ["Selecione um cenário para avaliação"],
+        weak_areas: [],
+        recommended_training_topics: []
+      };
+    }
     const knowledgeBase = getKnowledgeForScenario(selectedScenario.title);
     let faqContext = "";
     let checklistSection = "";
@@ -508,7 +424,6 @@ Forneça o objeto JSON com "suggested_response" e "reasoning" em português.`;
     if (knowledgeBase) {
       faqContext = knowledgeBase.technicalContent;
       
-      // Análise automática de cobertura dos pontos obrigatórios
       const coverage = analyzeAgentCoverage(messages, knowledgeBase.requiredPoints);
 
       checklistSection = `
@@ -539,7 +454,6 @@ IMPORTANTE: Use essa análise de cobertura como BASE PRINCIPAL para a nota de re
 - PROFISSIONALISMO: ${sc.professionalism}`;
       }
     } else {
-      // Fallback: RAG antigo
       try {
         faqContext = await GetSemanticFaqContext(selectedScenario.initial_problem);
         if (!faqContext && selectedScenario.moduleId) {
@@ -553,70 +467,16 @@ IMPORTANTE: Use essa análise de cobertura como BASE PRINCIPAL para a nota de re
       }
     }
 
-    const systemInstruction = `Você é um Auditor e Avaliador de Qualidade Sênior de Customer Success na Yooga.
-Sua tarefa é analisar rigorosamente a conversa de atendimento entre um agente em treinamento e um cliente fictício, e dar notas reais e dinâmicas de 0 a 100 baseadas na performance do analista.
-
-Seja extremamente analítico, sincero e rigoroso. Evite dar notas medianas repetitivas (como 75-80%) se o atendimento não foi bom ou se foi excelente. O cálculo deve refletir fielmente a conversa real.
-
-Você deve julgar o agente com base nos 5 Pilares de CS da Yooga e nas instruções técnicas do FAQ Oficial da Yooga.
-
-INSTRUÇÕES CRÍTICAS PARA OS PONTOS FORTES E DE MELHORIA:
-1. Na lista "strengths" (pontos fortes), liste obrigatoriamente de 2 a 4 pontos específicos nos quais o analista se destacou na conversa (ex: uso de termos corretos do FAQ, tom acolhedor no início, excelente tratativa). Se o atendimento foi bom (nota acima de 70%), esta lista NUNCA deve vir vazia!
-2. Na lista "improvements" (áreas de melhoria), você deve listar apenas críticas construtivas e pontos que ele errou ou pode aprimorar.
-3. Se o atendimento foi excelente (nota acima de 90%) e não houver pontos reais a melhorar, você DEVE retornar a lista de melhorias vazia [] ou apenas com ["Manter a excelente qualidade de atendimento"].
-4. NUNCA coloque elogios ou afirmações de maestria (como "não há pontos significativos de melhoria" ou "demonstrou maestria") dentro do campo "improvements"! Todos os elogios, pontos positivos e reconhecimentos de maestria pertencem EXCLUSIVAMENTE ao campo "strengths".
-
-═══ CONTEÚDO TÉCNICO OFICIAL QUE O AGENTE DEVERIA TER SEGUIDO ═══
-${faqContext}
-${checklistSection}
-${commonMistakesSection}
-${scoringRulesSection}
-
-Regras Gerais de Pontuação (Rubrica Yooga):
-- NOTA DE RESOLUÇÃO / CONHECIMENTO TÉCNICO (0 a 100):
-  * Use o CHECKLIST DE PONTOS OBRIGATÓRIOS acima como referência principal.
-  * Cada ponto obrigatório não coberto deve penalizar a nota proporcionalmente.
-  * Se o agente cometeu algum dos ERROS COMUNS listados acima, a nota deve ser reduzida significativamente (-20 a -30 pontos).
-- NOTA DE EMPATIA (0 a 100):
-  * Se o analista foi frio, robótico, apenas repetiu instruções técnicas sem acolher o sentimento do cliente, a nota de Empatia NÃO pode passar de 55.
-  * Se validou o momento estressante do cliente, demonstrou escuta ativa e colocou-se no lugar dele, a nota deve ser alta (85 a 100).
-- NOTA DE AGILIDADE / DISPONIBILIDADE (0 a 100):
-  * Se o atendimento demorou mais rodadas do que o ideal ou se o atendente prolongou o chat com perguntas repetitivas em vez de resolver, nota deve ser reduzida (50 a 65).
-- NOTA GERAL (overall_score) (0 a 100):
-  * Calcule: (Resolução * 0.4) + (Empatia * 0.3) + (Profissionalismo * 0.2) + (Agilidade * 0.1).
-
-Responda APENAS com um objeto JSON válido contendo a avaliação. Não use markdown, responda apenas com o JSON bruto em português brasileiro.`;
-
-    const prompt = `
-Cenário de Treinamento: "${selectedScenario.title}"
-Perfil do Cliente: "${selectedScenario.client_profile}"
-Problema Inicial do Cliente: "${selectedScenario.initial_problem}"
-Objetivos Esperados do Agente: ${selectedScenario.goals?.join(', ') || 'Resolver o problema do cliente.'}
-Tom de voz da empresa: "${tone_of_voice}"
-
-Conversa completa:
-${messages.map(m => `${m.sender === 'agent' ? 'AGENTE DE CS' : 'CLIENTE'}: ${m.message}`).join('\n')}
-
-Por favor, faça a análise detalhada e retorne o JSON com as chaves:
-- overall_score: nota geral (0 a 100)
-- empathy_score: nota de empatia (0 a 100)
-- resolution_score: nota de resolução/conhecimento técnico (0 a 100)
-- professionalism_score: nota de profissionalismo/humor (0 a 100)
-- agility_score: nota de agilidade/disponibilidade (0 a 100)
-- feedback: comentário geral resumido e construtivo de feedback (em português)
-- strengths: array de strings com pontos fortes demonstrados pelo agente
-- improvements: array de strings com pontos que ele pode melhorar no próximo atendimento
-- weak_areas: array de strings com as áreas/pilares mais fracas (ex: ["Proatividade", "Conhecimento Técnico"])
-- recommended_training_topics: array de strings contendo tópicos de estudo recomendados baseados no desempenho do agente`;
-
     try {
       const response = await InvokeLLM({
-        prompt: prompt,
-        system_instruction: systemInstruction,
-        file_urls: file_urls,
+        prompt: `Cenário: "${selectedScenario.title}" | Perfil: "${selectedScenario.client_profile}" | Problema: "${selectedScenario.initial_problem}"`,
         history: messages,
         goals: selectedScenario.goals,
         scenario_title: selectedScenario.title,
+        faq_context: faqContext,
+        checklist_section: checklistSection,
+        common_mistakes_section: commonMistakesSection,
+        scoring_rules_section: scoringRulesSection,
         response_json_schema: {
           type: "object",
           properties: {
@@ -670,6 +530,7 @@ Por favor, faça a análise detalhada e retorne o JSON com as chaves:
 
   const resetSimulation = () => {
     if (responseTimeoutRef.current) clearTimeout(responseTimeoutRef.current);
+    if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
     pendingAgentMessagesRef.current = [];
     setSelectedScenario(null);
     setCurrentSimulation(null);
@@ -701,7 +562,7 @@ Por favor, faça a análise detalhada e retorne o JSON com as chaves:
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link to={createPageUrl("Dashboard")}>
+          <Link to={createPageUrl("Dashboard")} aria-label="Voltar para Dashboard">
             <Button variant="outline" size="icon" className="h-12 w-12">
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -718,7 +579,7 @@ Por favor, faça a análise detalhada e retorne o JSON com as chaves:
 
         {!isSimulating ? (
           isLoadingData ? (
-            <div className="flex items-center justify-center py-24">
+            <div className="flex items-center justify-center py-24" role="status" aria-live="polite">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
             </div>
           ) : (
@@ -744,6 +605,7 @@ Por favor, faça a análise detalhada e retorne o JSON com as chaves:
             maxSuggestions={MAX_SUGGESTIONS}
             prefillMessage={prefillMessage}
             onPrefillConsumed={() => setPrefillMessage("")}
+            onTyping={handleAgentTyping}
           />
         )}
 
