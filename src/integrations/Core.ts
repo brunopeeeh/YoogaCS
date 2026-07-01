@@ -8,8 +8,7 @@
 
 import { Message } from "../types";
 import { loadFaqEmbeddings } from "../data/load-faq-embeddings";
-
-const BACKEND_URL = "http://localhost:8000";
+import { getBackendUrl } from "../utils/backend-url";
 // @ts-ignore
 const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || "";
 
@@ -72,7 +71,7 @@ export async function InvokeLLM({
       controller.abort();
     }, 60000);
 
-    const res = await fetch(`${BACKEND_URL}${endpoint}`, {
+    const res = await fetch(`${getBackendUrl()}${endpoint}`, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
@@ -321,7 +320,7 @@ export async function GetSemanticFaqContext(promptText: string): Promise<string>
     if (BACKEND_API_KEY) {
       headers["X-API-Key"] = BACKEND_API_KEY;
     }
-    const res = await fetch(`${BACKEND_URL}/api/rag/search`, {
+    const res = await fetch(`${getBackendUrl()}/api/rag/search`, {
       method: "POST",
       headers,
       body: JSON.stringify({ query: promptText })
