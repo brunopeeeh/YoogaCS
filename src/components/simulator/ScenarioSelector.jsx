@@ -40,11 +40,11 @@ export default function ScenarioSelector({
     return (
       <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
         {/* Card Focado do Cenário */}
-        <Card className="bg-white/70 backdrop-blur-md border-slate-200/80 rounded-2xl shadow-xl overflow-hidden border-t-4 border-t-[#FF6600]">
+        <Card className="bg-white/70 backdrop-blur-md border-slate-200/80 rounded-2xl shadow-xl overflow-hidden border-t-4 border-t-primary">
           <CardHeader className="bg-gradient-to-b from-slate-50/50 to-transparent pb-4">
             <div className="flex flex-wrap gap-2 mb-3">
               {scenarioModule && (
-                <Badge className="bg-orange-50 text-[#FF6600] border border-orange-100 font-semibold rounded-lg">
+                <Badge className="bg-primary/10 text-primary border border-primary/20 font-semibold rounded-lg">
                   Trilha: {scenarioModule.name}
                 </Badge>
               )}
@@ -71,8 +71,8 @@ export default function ScenarioSelector({
               </p>
             )}
 
-            <div className="bg-gradient-to-r from-orange-50/80 to-transparent border border-orange-100/50 p-5 rounded-2xl">
-              <span className="text-xs font-bold text-[#FF6600] uppercase tracking-wider block mb-1">Contexto Inicial do Cliente</span>
+            <div className="bg-gradient-to-r from-primary/10 to-transparent border border-primary/25 p-5 rounded-2xl">
+              <span className="text-xs font-bold text-primary uppercase tracking-wider block mb-1">Contexto Inicial do Cliente</span>
               <p className="text-slate-800 text-base font-medium leading-relaxed">
                 "{selectedScenario.initial_problem}"
               </p>
@@ -84,7 +84,7 @@ export default function ScenarioSelector({
                 <ul className="grid grid-cols-1 gap-2.5">
                   {selectedScenario.goals.map((goal, index) => (
                     <li key={index} className="flex items-start gap-3 text-slate-700 leading-relaxed text-sm">
-                      <span className="text-[#FF6600] mt-1.5 w-1.5 h-1.5 rounded-full bg-[#FF6600] flex-shrink-0" />
+                      <span className="text-primary mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                       {goal}
                     </li>
                   ))}
@@ -124,11 +124,11 @@ export default function ScenarioSelector({
       {/* Agent Info */}
       <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 rounded-2xl shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-800">
-            <User className="w-5 h-5 text-[#002D62]" />
-            Agente em Treinamento
-          </CardTitle>
-        </CardHeader>
+        <CardTitle className="flex items-center gap-2 text-slate-800">
+          <User className="w-5 h-5 text-primary" />
+          Agente em Treinamento
+        </CardTitle>
+      </CardHeader>
         <CardContent>
           <div className="space-y-2">
             <Label htmlFor="agent-name" className="text-slate-700 font-medium">Nome do Agente</Label>
@@ -149,11 +149,11 @@ export default function ScenarioSelector({
       {/* Scenario Selection */}
       <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 rounded-2xl shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-slate-800">
-            <MessageSquare className="w-5 h-5 text-[#002D62]" />
-            Escolha um Cenário de Treinamento
-          </CardTitle>
-        </CardHeader>
+        <CardTitle className="flex items-center gap-2 text-slate-800">
+          <MessageSquare className="w-5 h-5 text-primary" />
+          Escolha um Cenário de Treinamento
+        </CardTitle>
+      </CardHeader>
         <CardContent>
           {scenarios.length === 0 ? (
             <div className="text-center py-8">
@@ -187,14 +187,14 @@ export default function ScenarioSelector({
                     }}
                     className={`flex items-start gap-4 rounded-2xl border p-5 cursor-pointer transition-all duration-200 hover:scale-[1.005] active:scale-[0.995] bg-white/40 hover:bg-white/90 ${
                       isSelected 
-                        ? 'border-[#FF6600] shadow-sm bg-gradient-to-tr from-white to-orange-50/10 shadow-orange-100/50' 
+                        ? 'border-primary shadow-sm bg-gradient-to-tr from-white to-primary/15 shadow-primary/10' 
                         : 'border-slate-200/60 hover:border-slate-300'
                     }`}
                   >
                     <RadioGroupItem 
                       value={scenario.id} 
                       id={scenario.id}
-                      className="mt-1 border-slate-300 text-[#FF6600] focus:ring-[#FF6600]"
+                      className="mt-1 border-slate-300 text-primary focus:ring-primary"
                       checked={isSelected}
                     />
                     <div className="flex-1 space-y-2.5">
@@ -217,7 +217,7 @@ export default function ScenarioSelector({
                         return (
                           <div className="flex flex-wrap gap-2">
                             {scenarioModule && (
-                              <Badge className="bg-orange-50 text-[#FF6600] hover:bg-orange-100/60 border border-orange-100 font-semibold rounded-lg">
+                              <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 font-semibold rounded-lg">
                                 Trilha: {scenarioModule.name}
                               </Badge>
                             )}
@@ -248,7 +248,7 @@ export default function ScenarioSelector({
                           <ul className="text-sm text-slate-600 space-y-1">
                             {scenario.goals.map((goal, index) => (
                               <li key={index} className="flex items-start gap-2 leading-relaxed">
-                                <span className="text-[#FF6600] mt-1.5 w-1.5 h-1.5 rounded-full bg-[#FF6600] flex-shrink-0" />
+                                <span className="text-yooga-accent mt-1.5 w-1.5 h-1.5 rounded-full bg-yooga-accent flex-shrink-0" />
                                 {goal}
                               </li>
                             ))}

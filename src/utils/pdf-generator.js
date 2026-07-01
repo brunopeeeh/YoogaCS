@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 
-const primaryColor = [0, 45, 98]; // #002D62 (Deep Blue Yooga)
-const secondaryColor = [255, 102, 0]; // #FF6600 (Orange Yooga)
+const primaryColor = [25, 161, 230]; // #19A1E6 (Yooga Brand Sky Blue)
+const secondaryColor = [244, 91, 147]; // #F45B93 (Yooga Accent Pink)
 const grayText = [100, 116, 139]; // Slate 500
 const darkText = [15, 23, 42]; // Slate 900
 
@@ -93,7 +93,7 @@ export function exportIndividualPDF(user, simulations, scenarios, quizAttempts, 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   const avgScoreSim = completedSimulations.length > 0 
-    ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.overall_score, 0) / completedSimulations.length)
+    ? Math.round(completedSimulations.reduce((acc, sim) => acc + (sim.evaluation?.overall_score ?? 0), 0) / completedSimulations.length)
     : 0;
   doc.setTextColor(16, 185, 129); // verde
   doc.text(`${avgScoreSim}%`, 65, 93);
@@ -126,10 +126,10 @@ export function exportIndividualPDF(user, simulations, scenarios, quizAttempts, 
   doc.setFontSize(11);
   doc.text("Média de Desempenho por Competências de CS Yooga", 15, 110);
   
-  const empathy = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.empathy_score, 0) / completedSimulations.length) : 0;
-  const resolution = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.resolution_score, 0) / completedSimulations.length) : 0;
-  const professionalism = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.professionalism_score, 0) / completedSimulations.length) : 0;
-  const agility = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.agility_score, 0) / completedSimulations.length) : 0;
+  const empathy = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + (sim.evaluation?.empathy_score ?? 0), 0) / completedSimulations.length) : 0;
+  const resolution = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + (sim.evaluation?.resolution_score ?? 0), 0) / completedSimulations.length) : 0;
+  const professionalism = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + (sim.evaluation?.professionalism_score ?? 0), 0) / completedSimulations.length) : 0;
+  const agility = completedSimulations.length > 0 ? Math.round(completedSimulations.reduce((acc, sim) => acc + (sim.evaluation?.agility_score ?? 0), 0) / completedSimulations.length) : 0;
   
   const competencies = [
     { name: "Empatia (Sensibilidade e validação da dor do cliente)", score: empathy },
@@ -322,10 +322,10 @@ export function exportConsolidatedPDF(simulations, certifications, modules, user
   doc.setFontSize(12);
   doc.text("2. Desempenho Agregado por Pilar CS Yooga", 15, 92);
 
-  const empGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + sim.evaluation.empathy_score, 0) / completedGlobal.length) : 0;
-  const resGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + sim.evaluation.resolution_score, 0) / completedGlobal.length) : 0;
-  const proGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + sim.evaluation.professionalism_score, 0) / completedGlobal.length) : 0;
-  const agiGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + sim.evaluation.agility_score, 0) / completedGlobal.length) : 0;
+  const empGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + (sim.evaluation?.empathy_score ?? 0), 0) / completedGlobal.length) : 0;
+  const resGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + (sim.evaluation?.resolution_score ?? 0), 0) / completedGlobal.length) : 0;
+  const proGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + (sim.evaluation?.professionalism_score ?? 0), 0) / completedGlobal.length) : 0;
+  const agiGlobal = completedGlobal.length > 0 ? Math.round(completedGlobal.reduce((acc, sim) => acc + (sim.evaluation?.agility_score ?? 0), 0) / completedGlobal.length) : 0;
 
   const competencies = [
     { name: "Empatia (Sensibilidade e validação da dor do cliente)", score: empGlobal },
@@ -408,16 +408,16 @@ export function exportConsolidatedPDF(simulations, certifications, modules, user
   const agents = users.filter(u => u.role !== 'admin');
   
   agents.forEach(ag => {
-    const agSims = simulations.filter(s => s.created_by === ag.email && s.status === 'concluida');
-    const avg = agSims.length > 0 ? Math.round(agSims.reduce((acc, s) => acc + s.evaluation.overall_score, 0) / agSims.length) : 0;
-    const certCount = certifications.filter(c => c.created_by.toLowerCase() === ag.email.toLowerCase()).length;
+    const agSims = simulations.filter(s => (s.created_by || '').toLowerCase() === (ag.email || '').toLowerCase() && s.status === 'concluida');
+    const avg = agSims.length > 0 ? Math.round(agSims.reduce((acc, s) => acc + (s.evaluation?.overall_score ?? 0), 0) / agSims.length) : 0;
+    const certCount = certifications.filter(c => (c.created_by || '').toLowerCase() === (ag.email || '').toLowerCase()).length;
     
     doc.text(ag.full_name || ag.email, 18, rowY);
     doc.text(`${agSims.length}`, 90, rowY);
     doc.text(`${avg}%`, 120, rowY);
     doc.text(`${certCount}`, 150, rowY);
     
-    const lastSim = agSims.length > 0 ? new Date(Math.max(...agSims.map(s => new Date(s.created_date)))).toLocaleDateString('pt-BR') : 'Nunca';
+    const lastSim = agSims.length > 0 ? new Date(Math.max(...agSims.map(s => { const d = new Date(s.created_date); return isNaN(d) ? 0 : d; }))).toLocaleDateString('pt-BR') : 'Nunca';
     doc.text(lastSim, 172, rowY);
     
     doc.setDrawColor(241, 245, 249);

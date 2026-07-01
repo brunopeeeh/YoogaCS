@@ -40,7 +40,7 @@ export default function QuickActions({ scenarios, onRefresh, userRole }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <Link to={createPageUrl("Simulator")}>
-            <Button className="w-full justify-between bg-gradient-to-r from-[#002D62] to-[#004094] hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer">
+            <Button className="w-full justify-between bg-gradient-to-r from-yooga-primary to-yooga-primary-dark hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white">
               <span className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
                 Nova Simulação
@@ -58,12 +58,12 @@ export default function QuickActions({ scenarios, onRefresh, userRole }) {
               <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
-
+ 
           {isAdmin && (
             <Link to={`${createPageUrl("Scenarios")}?generate=true`}>
-              <Button variant="outline" className="w-full justify-between border-blue-200 hover:bg-blue-50/50 hover:text-[#002D62] text-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer">
+              <Button variant="outline" className="w-full justify-between border-purple-200 hover:bg-purple-50/50 hover:text-yooga-primary text-slate-700 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer">
                 <span className="flex items-center gap-2 font-medium">
-                  <Sparkles className="w-4 h-4 text-blue-500" />
+                  <Sparkles className="w-4 h-4 text-yooga-accent" />
                   Gerar Cenário com IA
                 </span>
                 <ArrowRight className="w-4 h-4" />
@@ -72,7 +72,7 @@ export default function QuickActions({ scenarios, onRefresh, userRole }) {
           )}
         </CardContent>
       </Card>
-
+ 
       {/* Featured Scenarios */}
       <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60">
         <CardHeader>
@@ -86,7 +86,7 @@ export default function QuickActions({ scenarios, onRefresh, userRole }) {
             <div className="text-center py-4">
               <p className="text-slate-500 text-sm">Nenhum cenário ativo</p>
               <Link to={createPageUrl("Scenarios")}>
-                <Button variant="link" className="text-blue-600 p-0 h-auto">
+                <Button variant="link" className="text-yooga-primary p-0 h-auto">
                   Criar primeiro cenário
                 </Button>
               </Link>

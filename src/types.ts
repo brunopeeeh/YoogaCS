@@ -24,6 +24,7 @@ export interface Scenario {
   expected_interactions: number;
   goals: string[];
   status: 'ativo' | 'inativo';
+  context?: string;
   moduleId?: string;
   created_date?: string;
   updated_date?: string;

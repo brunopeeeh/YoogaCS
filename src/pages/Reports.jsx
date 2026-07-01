@@ -79,9 +79,9 @@ export default function Reports() {
 
   if (isUserLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50/30 p-6 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3" role="status" aria-live="polite">
+          <div className="w-12 h-12 border-4 border-yooga-primary border-t-transparent rounded-full animate-spin"></div>
           <p className="text-lg font-medium text-slate-700">Carregando relatórios...</p>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50/30 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Header com botão de Exportar PDF */}
@@ -111,7 +111,7 @@ export default function Reports() {
           <Button 
             onClick={handleExportPDF} 
             disabled={completedSimulations.length === 0 && quizAttempts.length === 0}
-            className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-12 px-6 font-bold shadow-lg shadow-orange-500/10 flex items-center gap-2 border-0 transition-all duration-300"
+            className="bg-yooga-accent hover:bg-yooga-accent/90 text-white rounded-2xl h-12 px-6 font-bold shadow-lg shadow-yooga-accent/10 flex items-center gap-2 border-0 transition-all duration-300"
           >
             <Download className="w-5 h-5" />
             <span>Exportar Relatório PDF</span>
@@ -143,7 +143,7 @@ export default function Reports() {
               <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl overflow-hidden">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-blue-500" />
+                    <Clock className="w-4 h-4 text-yooga-primary" />
                     Minhas Simulações
                   </CardTitle>
                 </CardHeader>
@@ -160,12 +160,12 @@ export default function Reports() {
               <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl overflow-hidden">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-green-500" />
+                    <Award className="w-4 h-4 text-yooga-secondary" />
                     Nota Média de CS
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-extrabold text-green-600">
+                  <div className="text-3xl font-extrabold text-yooga-secondary">
                     {completedSimulations.length > 0 
                       ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.overall_score, 0) / completedSimulations.length)
                       : 0
@@ -180,12 +180,12 @@ export default function Reports() {
               <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl overflow-hidden">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
-                    <HelpCircle className="w-4 h-4 text-[#FF6600]" />
+                    <HelpCircle className="w-4 h-4 text-yooga-accent" />
                     Quizzes Realizados
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-extrabold text-[#FF6600]">
+                  <div className="text-3xl font-extrabold text-yooga-accent">
                     {quizAttempts.length}
                   </div>
                   <p className="text-xs text-slate-500 mt-1.5 font-medium">
@@ -197,12 +197,12 @@ export default function Reports() {
               <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl overflow-hidden">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
-                    <Trophy className="w-4 h-4 text-orange-500" />
+                    <Trophy className="w-4 h-4 text-yooga-accent" />
                     Módulos Certificados
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-extrabold text-orange-600">
+                  <div className="text-3xl font-extrabold text-yooga-accent">
                     {certifications.length}
                   </div>
                   <p className="text-xs text-slate-500 mt-1.5 font-medium">
@@ -220,7 +220,7 @@ export default function Reports() {
                 <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl overflow-hidden">
                   <CardHeader>
                     <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-orange-500" />
+                      <Trophy className="w-5 h-5 text-yooga-accent" />
                       Certificações Ativas
                     </CardTitle>
                     <CardDescription>Trilhas de conhecimento Yooga concluídas</CardDescription>
@@ -234,7 +234,7 @@ export default function Reports() {
                     ) : (
                       certifications.map((cert) => (
                         <div key={cert.id} className="flex items-center gap-3 p-3 rounded-xl border border-green-100 bg-green-50/30">
-                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-yooga-secondary shrink-0">
                             <CheckCircle2 className="w-5 h-5" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -261,7 +261,7 @@ export default function Reports() {
               <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
                 <CardHeader>
                   <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-orange-500" />
+                    <Trophy className="w-5 h-5 text-yooga-accent" />
                     Selo Oficial Yooga CS
                   </CardTitle>
                   <CardDescription>Módulos de suporte técnico concluídos com aproveitamento</CardDescription>
@@ -280,7 +280,7 @@ export default function Reports() {
                       {certifications.map((cert) => (
                         <div key={cert.id} className="p-4 rounded-2xl border-2 border-green-500/20 bg-green-50/20 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
                           <div className="absolute top-0 right-0 w-16 h-16 bg-green-500/10 rounded-bl-full flex items-center justify-center">
-                            <Trophy className="w-5 h-5 text-green-600 translate-x-2.5 -translate-y-2.5" />
+                            <Trophy className="w-5 h-5 text-yooga-secondary translate-x-2.5 -translate-y-2.5" />
                           </div>
                           <div className="text-xs font-bold text-green-700 tracking-wider uppercase mb-1.5">Certificado</div>
                           <h4 className="font-extrabold text-sm text-slate-900 mb-1 leading-snug">{cert.moduleName}</h4>
@@ -300,7 +300,7 @@ export default function Reports() {
               <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
                 <CardHeader>
                   <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <HelpCircle className="w-5 h-5 text-[#FF6600]" />
+                    <HelpCircle className="w-5 h-5 text-yooga-accent" />
                     Histórico de Quizzes Efetuados
                   </CardTitle>
                   <CardDescription>Lista completa de tentativas de validação teórica</CardDescription>

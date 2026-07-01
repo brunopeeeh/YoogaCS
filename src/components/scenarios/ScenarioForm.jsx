@@ -91,14 +91,15 @@ export default function ScenarioForm({ scenario, onSubmit, onCancel }) {
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        role="dialog" aria-modal="true" aria-labelledby="scenario-form-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-xl font-bold text-slate-900">
+          <h2 id="scenario-form-title" className="text-xl font-bold text-slate-900">
             {scenario ? 'Editar Cenário' : 'Novo Cenário'}
           </h2>
           <button
             onClick={onCancel}
+            aria-label="Fechar formulário"
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <X className="w-5 h-5 text-slate-500" />
@@ -241,7 +242,7 @@ export default function ScenarioForm({ scenario, onSubmit, onCancel }) {
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addGoal())}
                 placeholder="Adicionar objetivo..."
               />
-              <Button type="button" variant="outline" onClick={addGoal}>
+              <Button type="button" variant="outline" onClick={addGoal} aria-label="Adicionar objetivo">
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
@@ -250,7 +251,7 @@ export default function ScenarioForm({ scenario, onSubmit, onCancel }) {
                 {formData.goals.map((goal, i) => (
                   <li key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-sm">
                     <span className="text-slate-700">{goal}</span>
-                    <button type="button" onClick={() => removeGoal(i)}>
+                    <button type="button" onClick={() => removeGoal(i)} aria-label="Remover objetivo">
                       <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-500 transition-colors" />
                     </button>
                   </li>
@@ -271,7 +272,7 @@ export default function ScenarioForm({ scenario, onSubmit, onCancel }) {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 h-11 bg-gradient-to-r from-[#002D62] to-[#004094] hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold rounded-xl"
+              className="flex-1 h-11 bg-gradient-to-r from-primary to-yooga-primary-dark hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold rounded-xl"
             >
               {isSubmitting ? 'Salvando...' : (scenario ? 'Salvar Alterações' : 'Criar Cenário')}
             </Button>

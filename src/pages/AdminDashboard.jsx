@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Simulation, User, Scenario, AgentPerformance } from "@/entities/all";
 import { useUser } from "../components/auth/UserProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -93,71 +94,63 @@ export default function AdminDashboard() {
     }
   };
 
+  const headerActionsEl = typeof document !== 'undefined' ? document.getElementById('layout-header-actions') : null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6">
+      {headerActionsEl && createPortal(
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          {/* Filtro de agentes */}
+          <div className="flex items-center gap-2 bg-white/80 border border-slate-200/50 rounded-2xl px-3 py-1.5 shadow-sm backdrop-blur-sm shrink-0">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <SelectTrigger className="w-44 bg-transparent border-0 focus:ring-0 p-0 text-xs font-bold text-slate-700 h-7">
+                <SelectValue placeholder="Filtrar por agente..." />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl shadow-lg border-slate-200/60">
+                <SelectItem value="all">Todos os Agentes</SelectItem>
+                {users.filter(u => u.role !== 'admin').map(userItem => (
+                  <SelectItem key={userItem.id} value={userItem.email}>
+                    {userItem.full_name || userItem.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Botão de Exportar PDF */}
+          <Button
+            onClick={handleExportPDF}
+            disabled={isLoading || (selectedAgent !== 'all' && filteredSimulations.length === 0)}
+            className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-11 px-5 font-bold shadow-lg shadow-orange-500/10 flex items-center justify-center gap-2 border-0 transition-all duration-300 grow sm:grow-0 shrink-0 text-xs"
+          >
+            <Download className="w-4 h-4" />
+            <span>{selectedAgent === 'all' ? "Exportar Relatório Mensal" : "Exportar 1:1 Analista"}</span>
+          </Button>
+        </div>,
+        headerActionsEl
+      )}
+
       <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Dashboard do Administrador
-            </h1>
-            <p className="text-slate-600 mt-1">
-              Visão consolidada da equipe e controle de performance dos 15 agentes de CS da Yooga.
-            </p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-            {/* Filtro de agentes */}
-            <div className="flex items-center gap-2 bg-white/80 border border-slate-200/50 rounded-2xl px-3 py-1.5 shadow-sm backdrop-blur-sm shrink-0">
-              <Filter className="w-4 h-4 text-slate-500" />
-              <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                <SelectTrigger className="w-44 bg-transparent border-0 focus:ring-0 p-0 text-xs font-bold text-slate-700 h-7">
-                  <SelectValue placeholder="Filtrar por agente..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl shadow-lg border-slate-200/60">
-                  <SelectItem value="all">Todos os Agentes</SelectItem>
-                  {users.filter(u => u.role !== 'admin').map(userItem => (
-                    <SelectItem key={userItem.id} value={userItem.email}>
-                      {userItem.full_name || userItem.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Botão de Exportar PDF */}
-            <Button 
-              onClick={handleExportPDF} 
-              disabled={isLoading || (selectedAgent !== 'all' && filteredSimulations.length === 0)}
-              className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-11 px-5 font-bold shadow-lg shadow-orange-500/10 flex items-center justify-center gap-2 border-0 transition-all duration-300 grow sm:grow-0 shrink-0 text-xs"
-            >
-              <Download className="w-4 h-4" />
-              <span>{selectedAgent === 'all' ? "Exportar Relatório Mensal" : "Exportar 1:1 Analista"}</span>
-            </Button>
-          </div>
-        </div>
-
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:grid-cols-6 bg-white/80 border border-slate-200/50 rounded-2xl p-1 shadow-sm backdrop-blur-sm">
             <TabsTrigger value="overview" className="gap-2 rounded-xl py-2.5">
               <BarChart3 className="w-4 h-4" />
               Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="performance" className="gap-2 rounded-xl py-2.5">
+            <TabsTrigger value="performance" className="clean-tab-trigger">
               <TrendingUp className="w-4 h-4" />
               Evolução
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2 rounded-xl py-2.5">
+            <TabsTrigger value="analytics" className="clean-tab-trigger">
               <Users className="w-4 h-4" />
               Classificação
             </TabsTrigger>
-            <TabsTrigger value="adaptive" className="gap-2 rounded-xl py-2.5">
+            <TabsTrigger value="adaptive" className="clean-tab-trigger">
               <Brain className="w-4 h-4" />
               IA Adaptativa
             </TabsTrigger>
-            <TabsTrigger value="rag" className="gap-2 rounded-xl py-2.5">
+            <TabsTrigger value="rag" className="clean-tab-trigger">
               <Database className="w-4 h-4" />
               Base RAG
             </TabsTrigger>
@@ -171,12 +164,12 @@ export default function AdminDashboard() {
             {isLoading ? (
               <Skeleton className="h-40 w-full rounded-2xl" />
             ) : (
-              <GlobalStats 
-                simulations={filteredSimulations} 
-                users={users} 
-                scenarios={scenarios} 
-                selectedAgentEmail={selectedAgent} 
-                selectedAgentName={selectedAgentName} 
+              <GlobalStats
+                simulations={filteredSimulations}
+                users={users}
+                scenarios={scenarios}
+                selectedAgentEmail={selectedAgent}
+                selectedAgentName={selectedAgentName}
                 certifications={certifications}
                 quizAttempts={quizAttempts}
               />
@@ -184,9 +177,9 @@ export default function AdminDashboard() {
             {isLoading ? (
               <Skeleton className="h-64 w-full rounded-2xl" />
             ) : (
-              <UserPerformanceComparison 
-                simulations={simulations} 
-                users={users} 
+              <UserPerformanceComparison
+                simulations={simulations}
+                users={users}
                 certifications={certifications}
               />
             )}

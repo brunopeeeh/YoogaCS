@@ -30,28 +30,28 @@ export default function ManageUsers() {
         User.list(),
         Simulation.list()
       ]);
-      
+
       setUsers(userData);
-      
+
       // Calcular estatísticas por usuário
       const stats = {};
       userData.forEach(user => {
         const userSimulations = simulationsData.filter(sim => sim.created_by.toLowerCase() === user.email.toLowerCase());
         const completedSimulations = userSimulations.filter(sim => sim.status === 'concluida' && sim.evaluation);
-        const avgScore = completedSimulations.length > 0 
+        const avgScore = completedSimulations.length > 0
           ? Math.round(completedSimulations.reduce((acc, sim) => acc + sim.evaluation.overall_score, 0) / completedSimulations.length)
           : 0;
-        
+
         stats[user.email] = {
           totalSimulations: userSimulations.length,
           completedSimulations: completedSimulations.length,
           averageScore: avgScore,
-          lastActivity: userSimulations.length > 0 
+          lastActivity: userSimulations.length > 0
             ? new Date(Math.max(...userSimulations.map(s => new Date(s.created_date))))
             : null
         };
       });
-      
+
       setUserStats(stats);
     } catch (error) {
       console.error("Erro ao carregar usuários:", error);
@@ -132,7 +132,7 @@ export default function ManageUsers() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -143,7 +143,7 @@ export default function ManageUsers() {
               Visualize a performance, atividade e gerencie o cadastro dos agentes da Yooga
             </p>
           </div>
-          <Badge variant="secondary" className="gap-2 px-3 py-1 text-sm bg-blue-100 text-blue-800 border-blue-200">
+          <Badge variant="secondary" className="gap-2 px-3 py-1 text-sm bg-primary/10 text-primary border-primary/20">
             <Users className="w-4 h-4" />
             {users.length} agentes ativos
           </Badge>
@@ -151,13 +151,13 @@ export default function ManageUsers() {
 
         {/* Layout em Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Formulário de Criação (Lateral Esquerda ou 1/3) */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="bg-white shadow-md border-slate-200/80">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-slate-800 text-xl">
-                  <UserPlus className="w-5 h-5 text-blue-600" />
+                  <UserPlus className="w-5 h-5 text-primary" />
                   Cadastrar Novo Agente
                 </CardTitle>
                 <CardDescription>
@@ -174,7 +174,7 @@ export default function ManageUsers() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
-                      className="rounded-xl border-slate-200 focus-visible:ring-blue-500"
+                      className="rounded-xl border-slate-200 focus-visible:ring-primary"
                     />
                   </div>
 
@@ -187,7 +187,7 @@ export default function ManageUsers() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="rounded-xl border-slate-200 focus-visible:ring-blue-500"
+                      className="rounded-xl border-slate-200 focus-visible:ring-primary"
                     />
                   </div>
 
@@ -202,7 +202,7 @@ export default function ManageUsers() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        className="pl-9 rounded-xl border-slate-200 focus-visible:ring-blue-500"
+                        className="pl-9 rounded-xl border-slate-200 focus-visible:ring-primary"
                       />
                     </div>
                   </div>
@@ -213,7 +213,7 @@ export default function ManageUsers() {
                       id="role"
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
-                      className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                      className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                     >
                       <option value="agent">Agente (CS / Suporte)</option>
                       <option value="admin">Administrador (Coordenador / Líder)</option>
@@ -224,7 +224,7 @@ export default function ManageUsers() {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-[#002D62] to-[#004094] hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-white font-semibold rounded-xl h-11 cursor-pointer"
+                    className="w-full bg-gradient-to-r from-primary to-yooga-primary-dark hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-white font-semibold rounded-xl h-11 cursor-pointer"
                   >
                     {isSubmitting ? "Cadastrando..." : "Confirmar Cadastro"}
                   </Button>
@@ -232,19 +232,19 @@ export default function ManageUsers() {
               </form>
             </Card>
 
-            <Card className="bg-blue-50 border-blue-200">
+            <Card className="bg-primary/10 border-primary/20">
               <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-blue-800">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-primary">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   Dica de Migração para Banco
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 pt-0 text-xs text-blue-700 leading-relaxed space-y-1">
+              <CardContent className="p-4 pt-0 text-xs text-primary leading-relaxed space-y-1">
                 <p>
                   O cadastro de equipe armazena as informações localmente em formato estruturado.
                 </p>
                 <p>
-                  Quando formos migrar para o **Supabase**, substituiremos esta função local por uma chamada ao Supabase Auth + inserção na tabela <code className="bg-blue-100 px-1 rounded font-mono">profiles</code>. A modelagem local já segue esse padrão!
+                  Quando formos migrar para o **Supabase**, substituiremos esta função local por uma chamada ao Supabase Auth + inserção na tabela <code className="bg-primary/20 px-1 rounded font-mono">profiles</code>. A modelagem local já segue esse padrão!
                 </p>
               </CardContent>
             </Card>
@@ -256,7 +256,7 @@ export default function ManageUsers() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-slate-800 text-xl flex items-center gap-2">
-                    <Users className="w-5 h-5 text-[#FF6600]" />
+                    <Users className="w-5 h-5 text-yooga-accent" />
                     Lista de Agentes Cadastrados
                   </CardTitle>
                   <CardDescription>
@@ -288,9 +288,9 @@ export default function ManageUsers() {
                                     <span className="truncate">{user.email}</span>
                                   </div>
                                 </div>
-                                <Badge 
-                                  variant={user.role === 'admin' ? 'default' : 'secondary'} 
-                                  className={user.role === 'admin' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'}
+                                <Badge
+                                  variant={user.role === 'admin' ? 'default' : 'secondary'}
+                                  className={user.role === 'admin' ? 'bg-primary hover:bg-yooga-primary-dark text-white' : 'bg-slate-100 text-slate-700'}
                                 >
                                   {user.role === 'admin' && <ShieldCheck className="w-3 h-3 mr-1 shrink-0" />}
                                   {user.role === 'admin' ? 'Líder / Admin' : 'CS Agente'}
@@ -354,7 +354,7 @@ export default function ManageUsers() {
               </CardContent>
             </Card>
           </div>
-          
+
         </div>
       </div>
     </div>

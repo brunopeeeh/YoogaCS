@@ -149,6 +149,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
   };
 
   const handleQuickGenerate = async (scenarioType) => {
+    if (isLoading) return; // Prevent duplicate calls
     setIsLoading(true);
     setError(null);
 
@@ -220,7 +221,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
   };
 
   const handleCustomGenerate = async () => {
-    if (!customTopic.trim()) return;
+    if (!customTopic.trim() || isLoading) return; // Prevent duplicate calls
     
     setIsLoading(true);
     setError(null);
@@ -350,11 +351,14 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scenario-generator-title"
     >
       <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl border-slate-100 shadow-xl">
         <CardHeader className="border-b border-slate-100">
-          <CardTitle className="flex items-center gap-2 text-xl font-bold text-slate-900">
-            <BrainCircuit className="w-5.5 h-5.5 text-blue-600" />
+          <CardTitle id="scenario-generator-title" className="flex items-center gap-2 text-xl font-bold text-slate-900">
+            <BrainCircuit className="w-5.5 h-5.5 text-primary" />
             Gerador Inteligente de Cenários Yooga
           </CardTitle>
           <p className="text-sm text-slate-600 mt-1">
@@ -374,6 +378,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
                 <button
                   key={tag.value}
                   type="button"
+                  aria-pressed={selectedTags.includes(tag.value)}
                   onClick={() => {
                     setSelectedTags(prev => 
                       prev.includes(tag.value) 
@@ -383,7 +388,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
                   }}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 cursor-pointer ${
                     selectedTags.includes(tag.value)
-                      ? 'bg-blue-50 text-[#002D62] border-blue-200 shadow-sm'
+                      ? 'bg-primary/10 text-primary border-primary/20 shadow-sm font-semibold'
                       : 'bg-white text-slate-600 border-slate-200 hover:border-slate-350 hover:bg-slate-50'
                   }`}
                 >
@@ -406,8 +411,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
               {SCENARIO_TYPES.map((type) => (
                 <Card 
                   key={type.value} 
-                  className="p-5 border-slate-150 rounded-xl hover:shadow-md hover:scale-[1.015] active:scale-[0.99] transition-all duration-200 cursor-pointer flex flex-col justify-between" 
-                  onClick={() => handleQuickGenerate(type.value)}
+                  className={`p-5 border-slate-150 rounded-xl hover:shadow-md hover:scale-[1.015] active:scale-[0.99] transition-all duration-200 flex flex-col justify-between ${isLoading ? 'opacity-60 pointer-events-none' : 'cursor-pointer'}`}
                 >
                   <div>
                     <h4 className="font-bold text-slate-900 mb-1">{type.label}</h4>
@@ -418,10 +422,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
                     variant="outline" 
                     disabled={isLoading}
                     className="w-full rounded-lg hover:bg-slate-50 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer font-semibold h-9"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent card onClick from firing
-                      handleQuickGenerate(type.value);
-                    }}
+                    onClick={() => handleQuickGenerate(type.value)}
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
                     Gerar Agora
@@ -462,7 +463,7 @@ export default function ScenarioGenerator({ onCancel, onScenarioGenerated }) {
               <Button 
                 onClick={handleCustomGenerate} 
                 disabled={isLoading || !customTopic.trim()}
-                className="w-full h-11 bg-gradient-to-r from-[#002D62] to-[#004094] hover:opacity-95 hover:scale-[1.015] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold rounded-xl shadow-md"
+                className="w-full h-11 bg-gradient-to-r from-primary to-yooga-primary-dark hover:opacity-95 hover:scale-[1.015] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold rounded-xl shadow-md"
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

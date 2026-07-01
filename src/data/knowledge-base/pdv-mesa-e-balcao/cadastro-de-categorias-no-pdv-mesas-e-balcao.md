@@ -15,7 +15,7 @@ Apenas os usuários com funções de Administrador e Gerente possuem permissão 
 No seu [Yooga App](http://app.yooga.com.br), clique em **Ajustes** no canto esquerdo do sistema, e então selecione **Categorias
 [Imagem]
 
-Agora, clique em N**ova Categoria** no canto superior direito da tela
+Agora, clique em **Nova Categoria** no canto superior direito da tela
 
 [Imagem]
 

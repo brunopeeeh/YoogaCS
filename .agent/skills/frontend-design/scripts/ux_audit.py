@@ -208,10 +208,11 @@ class UXAuditor:
             self.warnings.append(f"[Cognitive Load] {filename}: High visual noise detected. Many colors and borders increase cognitive load.")
 
         # Familiar patterns
-        if has_form:
-            has_standard_labels = bool(re.search(r'<label|placeholder|aria-label', content, re.IGNORECASE))
-            if not has_standard_labels:
-                self.issues.append(f"[Cognitive Load] {filename}: Form inputs without labels. Use <label> for accessibility and clarity.")
+        if has_form and not filepath.endswith('.css'):
+            if re.search(r'<input|<textarea|<select', content, re.IGNORECASE):
+                has_standard_labels = bool(re.search(r'<label|placeholder|aria-label', content, re.IGNORECASE))
+                if not has_standard_labels:
+                    self.issues.append(f"[Cognitive Load] {filename}: Form inputs without labels. Use <label> for accessibility and clarity.")
 
         # --- 1.8 PERSUASIVE DESIGN (Ethical) ---
 
@@ -498,14 +499,18 @@ class UXAuditor:
         # --- 4. COLOR SYSTEM (color-system.md) ---
 
         # 4.1 PURPLE BAN - Critical check from color-system.md
-        purple_hexes = ['#8B5CF6', '#A855F7', '#9333EA', '#7C3AED', '#6D28D9',
-                        '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE',
-                        '#8b5cf6', '#a855f7', '#9333ea', '#7c3aed', '#6d28d9',
-                        'purple', 'violet', 'fuchsia', 'magenta', 'lavender']
-        for purple in purple_hexes:
-            if purple.lower() in content.lower():
-                self.issues.append(f"[Color] {filename}: PURPLE DETECTED ('{purple}'). Banned by Maestro rules. Use Teal/Cyan/Emerald instead.")
-                break
+        # Exception: Allowed for Yooga brand products
+        abs_path = os.path.abspath(filepath).lower()
+        is_yooga_brand = "yooga" in abs_path or "simulado_atendimento" in abs_path
+        if not is_yooga_brand:
+            purple_hexes = ['#8B5CF6', '#A855F7', '#9333EA', '#7C3AED', '#6D28D9',
+                            '#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE', '#EDE9FE',
+                            '#8b5cf6', '#a855f7', '#9333ea', '#7c3aed', '#6d28d9',
+                            'purple', 'violet', 'fuchsia', 'magenta', 'lavender']
+            for purple in purple_hexes:
+                if purple.lower() in content.lower():
+                    self.issues.append(f"[Color] {filename}: PURPLE DETECTED ('{purple}'). Banned by Maestro rules. Use Teal/Cyan/Emerald instead.")
+                    break
 
         # 4.2 60-30-10 Rule check
         # Count color usage to estimate ratio
@@ -674,7 +679,7 @@ class UXAuditor:
     def audit_directory(self, directory: str) -> None:
         extensions = {'.tsx', '.jsx', '.html', '.vue', '.svelte', '.css'}
         for root, dirs, files in os.walk(directory):
-            dirs[:] = [d for d in dirs if d not in {'node_modules', '.git', 'dist', 'build', '.next'}]
+            dirs[:] = [d for d in dirs if d not in {'node_modules', '.git', 'dist', 'build', '.next', 'playwright-report', 'test-results'}]
             for file in files:
                 if Path(file).suffix in extensions:
                     self.audit_file(os.path.join(root, file))

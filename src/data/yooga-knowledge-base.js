@@ -55,6 +55,8 @@ COMO FUNCIONA:
       professionalism: "Tom deve ser calmo e seguro, passando confiança. Usar linguagem positiva ('fique tranquilo, está tudo salvo') em vez de negativa ('não se preocupe com a perda')."
     },
 
+    defaultContext: "Este cenário se passa em uma sexta-feira às 12h30 (horário de pico de almoço). O restaurante está lotado, há fila de espera e a internet acabou de cair. O dono está desesperado porque não sabe se pode continuar vendendo.",
+
     relatedArticles: [
       "pdv-mesa-e-balcao/como-operar-pelo-caixa.md",
       "perguntas-frequentes/como-adicionar-duas-formas-de-pagamento-na-venda.md"
@@ -114,6 +116,8 @@ SOLUÇÃO PASSO A PASSO:
       professionalism: "Usar linguagem técnica clara sem ser condescendente. O cliente pode ser leigo em integrações."
     },
 
+    defaultContext: "Este cenário se passa em uma terça-feira às 10h da manhã. O gerente do restaurante percebeu que os preços de 5 itens no iFood estão diferentes do cardápio interno e está perdendo margem de lucro desde o fim de semana.",
+
     relatedArticles: [
       "integracoes/integracoes.md"
     ]
@@ -170,6 +174,8 @@ PASSOS PARA RESOLVER:
       agility: "Deve ser direto e dar um plano de ação imediato. Primeiro resolver o bloqueio (emitir manualmente ou sem nota), depois corrigir o CSC.",
       professionalism: "Assunto fiscal é sensível. O agente deve ser preciso e recomendar envolver o contador, sem tentar 'chutar' configurações fiscais."
     },
+
+    defaultContext: "Este cenário se passa em uma segunda-feira às 19h. O restaurante tem fila no caixa e todas as tentativas de emitir NFC-e estão falhando com erro de CSC inválido. O operador de caixa está ligando desesperado para o gerente.",
 
     relatedArticles: [
       "fiscal/fiscal.md",
@@ -234,6 +240,8 @@ PROBLEMA COMUM - TEXTO CORTADO NAS LATERAIS:
       professionalism: "Linguagem clara e passo a passo. Evitar jargões técnicos de impressora que o operador pode não conhecer."
     },
 
+    defaultContext: "Este cenário se passa em um sábado às 20h (noite de alto movimento para delivery). Vários motoboys já reclamaram que não conseguem ler o endereço de entrega nos tickets impressos. O dono está perdendo tempo reescrevendo endereços à mão.",
+
     relatedArticles: [
       "perguntas-frequentes/layout-de-impressao-como-ajustar-tamanho-da-fonte-margens-e-tamanho-da-bobina.md",
       "balancas-e-impressoras/balancas-e-impressoras.md"
@@ -297,6 +305,8 @@ DICAS IMPORTANTES:
       agility: "Cenário simples que deve ser resolvido em 1-2 mensagens no máximo.",
       professionalism: "Ser preciso com os nomes dos botões e campos do sistema. Usar a nomenclatura exata da Yooga."
     },
+
+    defaultContext: "Este cenário se passa em um domingo de Dia das Mães às 13h. O restaurante está com casa cheia e o cliente no balcão quer pagar R$ 150 em dinheiro e o restante no Pix. O operador de caixa é novo e nunca dividiu pagamento antes.",
 
     relatedArticles: [
       "perguntas-frequentes/como-adicionar-duas-formas-de-pagamento-na-venda.md",
@@ -368,6 +378,8 @@ PERSONALIZAR PERMISSÕES:
       professionalism: "Tom sério e profissional. Não fazer piadas sobre desvio de caixa. Transmitir segurança de que o sistema tem os controles necessários."
     },
 
+    defaultContext: "Este cenário se passa em uma quarta-feira às 15h (horário administrativo tranquilo). O gerente está revisando os relatórios financeiros e notou cancelamentos suspeitos feitos por um operador de caixa nos últimos dias. Ele quer implementar controles urgentes.",
+
     relatedArticles: [
       "perguntas-frequentes/senha-para-cancelamento-de-venda.md",
       "pdv-mesa-e-balcao/personalizar-permissoes-dos-usuarios.md",
@@ -418,6 +430,8 @@ COMO APARECE PARA O CLIENTE:
       agility: "Fornecer as instruções de ativação logo na primeira mensagem para agilizar o processo do cliente.",
       professionalism: "Ser extremamente claro ao descrever os botões exatos ('Chat com a loja' e 'Chat com o cliente') para evitar confusão."
     },
+
+    defaultContext: "Este cenário se passa em uma quinta-feira às 11h. O dono da hamburgueria está cansado de ter que responder clientes pelo WhatsApp pessoal enquanto gerencia os pedidos no Yooga. Ele quer centralizar tudo em um só lugar.",
 
     relatedArticles: [
       "delivery/chat-no-delivery.md"
@@ -502,28 +516,34 @@ export function analyzeAgentCoverage(messages, requiredPoints) {
     "centralizar o suporte": ["evitar", "desvio", "whatsapp", "centralizar", "restaurante"]
   };
   
+  const words = agentMessages.split(/[\s.,;:!?]+/).filter(Boolean);
+
+  const wordStartsWith = (stem) => {
+    if (stem.length < 3) return false;
+    return words.some(w => w.startsWith(stem));
+  };
+
   for (const point of requiredPoints) {
     const pointLower = point.toLowerCase();
-    
-    // Verificação simples: a mensagem do agente contém palavras-chave relevantes
     let isCovered = false;
-    
+
     for (const [checkKey, keywords] of Object.entries(keywordChecks)) {
-      if (pointLower.includes(checkKey.split(' ')[0])) {
-        isCovered = keywords.some(kw => agentMessages.includes(kw));
+      const firstWord = checkKey.split(' ')[0];
+      if (firstWord.length >= 4 && pointLower.includes(firstWord)) {
+        isCovered = keywords.some(kw => wordStartsWith(kw));
         if (isCovered) break;
       }
     }
-    
-    // Fallback: verificação genérica por palavras significativas do ponto
+
+    // Fallback: verificação genérica por palavra exata no texto do agente
     if (!isCovered) {
       const significantWords = pointLower
         .split(/\s+/)
-        .filter(w => w.length > 4 && !['sobre', 'quando', 'forma', 'entre', 'após', 'antes', 'deve', 'podem'].includes(w));
-      
-      isCovered = significantWords.some(word => agentMessages.includes(word));
+        .filter(w => w.length >= 3 && !['que', 'para', 'com', 'por', 'como', 'mais', 'mas', 'era', 'está', 'esta', 'pelo', 'pela', 'seus', 'sua', 'nas', 'dos', 'das'].includes(w));
+
+      isCovered = significantWords.some(word => words.includes(word));
     }
-    
+
     if (isCovered) {
       covered.push(point);
     } else {
