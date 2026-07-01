@@ -66,7 +66,13 @@ function createEntity(storageKey) {
         return await apiRequest(`/api/db/${storageKey}/${id}`, "PUT", data);
       } catch (err) {
         console.warn(`[Supabase Migration] API update falhou para ${storageKey}/${id}, usando fallback local e enfileirando:`, err.message);
-        const localItem = localEntity.update(id, data);
+        let localItem;
+        try {
+          localItem = localEntity.update(id, data);
+        } catch (localErr) {
+          // Se o item não existir localmente no localStorage, cria ele para evitar travamento da aplicação
+          localItem = localEntity.create({ id, ...data });
+        }
         addToQueue(storageKey, "update", id, data);
         return localItem;
       }
@@ -164,6 +170,26 @@ export const User = {
   },
 
   async login(email, password) {
+    // Tenta autenticação pelo backend primeiro
+    try {
+      const result = await apiRequest("/api/auth/login", "POST", { email, password });
+      const sessionUser = {
+        id: result.id,
+        full_name: result.full_name,
+        email: result.email,
+        role: result.role
+      };
+      sessionStorage.setItem('current_user', JSON.stringify(sessionUser));
+      return sessionUser;
+    } catch (err) {
+      if (err.message && err.message.includes("API returned status")) {
+        console.warn("[Yooga Auth] Backend indisponível, tentando login offline...");
+      } else {
+        throw err;
+      }
+    }
+
+    // Fallback offline: login via localStorage
     const users = await _userEntity.list();
     const hashedInput = await hashPassword(password);
     
@@ -174,7 +200,6 @@ export const User = {
 
     let isMatch = found.password === hashedInput;
 
-    // Fallback de Auto-Migração: Se a senha armazenada for igual à senha digitada em texto puro, migra para o hash
     if (!isMatch && found.password === password) {
       isMatch = true;
       try {

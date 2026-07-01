@@ -12,6 +12,22 @@ module.exports = {
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
+  			'yooga-primary-light-2': 'var(--yooga-primary-light-2)',
+  			'yooga-primary-light': 'var(--yooga-primary-light)',
+  			'yooga-primary': 'var(--yooga-primary)',
+  			'yooga-primary-dark': 'var(--yooga-primary-dark)',
+  			'yooga-primary-deep': 'var(--yooga-primary-deep)',
+  			'yooga-secondary': 'var(--yooga-secondary)',
+  			'yooga-secondary-dark': 'var(--yooga-secondary-dark)',
+  			'yooga-secondary-light': 'var(--yooga-secondary-light)',
+  			'yooga-accent': 'var(--yooga-accent)',
+  			'yooga-gray-50': 'var(--yooga-gray-50)',
+  			'yooga-gray-100': 'var(--yooga-gray-100)',
+  			'yooga-gray-200': 'var(--yooga-gray-200)',
+  			'yooga-gray-300': 'var(--yooga-gray-300)',
+  			'yooga-gray-600': 'var(--yooga-gray-600)',
+  			'yooga-gray-800': 'var(--yooga-gray-800)',
+  			'yooga-gray-900': 'var(--yooga-gray-900)',
   			card: {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'

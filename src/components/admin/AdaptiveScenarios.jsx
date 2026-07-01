@@ -37,7 +37,7 @@ export default function AdaptiveScenarios({ performanceData, scenarios }) {
 
     return {
       weakAreas: topWeakAreas.length > 0 ? topWeakAreas : ["Conhecimento Técnico", "Empatia"],
-      recommendedScenarios: scenarios.slice(0, 3),
+      recommendedScenarios: scenarios?.slice(0, 3) || [],
       adaptiveSuggestions
     };
   };
@@ -48,7 +48,7 @@ export default function AdaptiveScenarios({ performanceData, scenarios }) {
     <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-md rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-900">
-          <Brain className="w-5 h-5 text-[#FF6600]" />
+          <Brain className="w-5 h-5 text-yooga-accent" />
           Cenários Adaptativos Recomendados
         </CardTitle>
         <CardDescription>Sugestões personalizadas geradas com base nas fraquezas reais da equipe</CardDescription>
@@ -58,7 +58,7 @@ export default function AdaptiveScenarios({ performanceData, scenarios }) {
           <h4 className="font-bold text-sm text-slate-900 mb-2.5">Principais Pontos de Atenção de CS da Equipe</h4>
           <div className="flex flex-wrap gap-2">
             {recommendations.weakAreas.map((area, index) => (
-              <span key={index} className="px-3.5 py-1.5 bg-orange-100 text-orange-800 rounded-full font-bold text-xs border border-orange-200">
+              <span key={index} className="px-3.5 py-1.5 bg-yooga-accent/10 text-yooga-accent rounded-full font-bold text-xs border border-yooga-accent/20">
                 {area}
               </span>
             ))}
@@ -70,7 +70,7 @@ export default function AdaptiveScenarios({ performanceData, scenarios }) {
           <ul className="space-y-3">
             {recommendations.adaptiveSuggestions.map((suggestion, index) => (
               <li key={index} className="flex items-start gap-2.5 text-sm text-slate-600 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100/60">
-                <span className="text-blue-500 mt-1 shrink-0">•</span>
+                <span className="text-yooga-primary mt-1 shrink-0">•</span>
                 <span>{suggestion}</span>
               </li>
             ))}
@@ -80,13 +80,13 @@ export default function AdaptiveScenarios({ performanceData, scenarios }) {
         <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="space-y-0.5">
             <h5 className="text-xs font-bold text-slate-950 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#FF6600]" />
+              <Sparkles className="w-3.5 h-3.5 text-yooga-accent" />
               Novos Cenários Adaptativos
             </h5>
             <p className="text-[11px] text-slate-500">Gere cenários na hora baseados nos feedbacks com IA</p>
           </div>
           <Link to={`${createPageUrl("Scenarios")}?generate=true`} className="w-full sm:w-auto">
-            <Button className="w-full bg-[#002D62] hover:bg-[#004094] gap-2 h-10 px-4 text-xs font-bold text-white rounded-xl shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer">
+            <Button className="w-full bg-yooga-primary hover:bg-yooga-primary-dark gap-2 h-10 px-4 text-xs font-bold text-white rounded-xl shadow-sm shadow-yooga-primary/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer">
               <Sparkles className="w-3.5 h-3.5" />
               Gerar Cenário com IA
             </Button>

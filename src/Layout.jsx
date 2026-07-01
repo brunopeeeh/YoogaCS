@@ -3,7 +3,6 @@ import React from "react";
 import { Link, useLocation, Navigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { UserProvider, useUser } from "./components/auth/UserProvider"; // Importar o Provider e o hook
-import SyncStatusIndicator from "./components/sync/SyncStatusIndicator";
 import NotificationBell from "./components/notifications/NotificationBell";
 import { 
   MessageSquare, 
@@ -54,7 +53,7 @@ const MobileSidebarTrigger = () => {
   return (
     <button
       onClick={toggleSidebar}
-      className="p-2 -ml-2 mr-2 text-slate-600 hover:text-[#002D62] hover:bg-slate-100/50 rounded-xl transition-all duration-200 cursor-pointer active:scale-95 flex items-center justify-center"
+      className="p-2 -ml-2 mr-2 text-slate-600 hover:text-primary hover:bg-slate-100/50 rounded-xl transition-all duration-200 cursor-pointer active:scale-95 flex items-center justify-center"
       aria-label="Toggle Sidebar"
     >
       <Menu className="w-5 h-5" />
@@ -71,8 +70,8 @@ function AppLayout({ children, currentPageName }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-yooga-primary/5" role="status" aria-live="polite">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -93,15 +92,15 @@ function AppLayout({ children, currentPageName }) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-yooga-primary/5">
         <Sidebar className="border-r border-slate-200/60 bg-white/80 backdrop-blur-sm">
           <SidebarHeader className="border-b border-slate-200/60 p-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-xl flex items-center justify-center shadow-md">
+              <div className="w-10 h-10 bg-gradient-to-r from-primary to-yooga-primary-dark rounded-xl flex items-center justify-center shadow-md animate-pulse">
                 <MessageSquare className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="font-bold text-lg text-slate-900">CS Coach</h1>
+                <h2 className="font-bold text-lg text-slate-900">CS Coach</h2>
                 <p className="text-xs text-slate-500">Simulador de Atendimento</p>
               </div>
             </div>
@@ -118,13 +117,13 @@ function AppLayout({ children, currentPageName }) {
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton 
                         asChild 
-                        className={`hover:bg-blue-50 hover:text-[#002D62] transition-all duration-200 rounded-xl h-12 hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
+                        className={`hover:bg-primary/10 hover:text-primary transition-all duration-200 rounded-xl h-12 hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
                           location.pathname === item.url 
-                            ? 'bg-gradient-to-r from-blue-50/50 to-slate-50 text-[#002D62] shadow-sm border-l-2 border-[#FF6600]' 
+                            ? 'bg-gradient-to-r from-primary/10 to-transparent text-primary shadow-sm border-l-2 border-yooga-accent font-semibold' 
                             : 'text-slate-600'
                         }`}
                       >
-                        <Link to={item.url} className="flex items-center gap-3 px-4 py-3">
+                        <Link to={item.url} className="flex items-center gap-3 px-4 py-3" aria-current={location.pathname === item.url ? "page" : undefined}>
                           <item.icon className="w-5 h-5" />
                           <span className="font-medium">{item.title}</span>
                         </Link>
@@ -142,7 +141,7 @@ function AppLayout({ children, currentPageName }) {
               <SidebarGroupContent>
                 <div className="px-3 py-2">
                   <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <div className="w-2 h-2 bg-yooga-secondary rounded-full animate-ping"></div>
                     Sistema Online
                   </div>
                 </div>
@@ -153,7 +152,7 @@ function AppLayout({ children, currentPageName }) {
           <SidebarFooter className="border-t border-slate-200/60 p-4">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50/80 border border-slate-100">
-                <div className="w-8 h-8 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                <div className="w-8 h-8 bg-gradient-to-r from-primary to-yooga-primary-dark rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
                   {(user?.full_name || 'A')[0]}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -163,7 +162,7 @@ function AppLayout({ children, currentPageName }) {
                   </p>
                 </div>
                 {userRole === 'admin' && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
                     <ShieldCheck className="w-3 h-3 mr-1" />
                     Admin
                   </Badge>
@@ -188,21 +187,18 @@ function AppLayout({ children, currentPageName }) {
                 <MobileSidebarTrigger />
               </div>
               <div className="flex items-center gap-2 lg:hidden">
-                <div className="w-8 h-8 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-lg flex items-center justify-center shadow-sm">
+                <div className="w-8 h-8 bg-gradient-to-r from-primary to-yooga-primary-dark rounded-lg flex items-center justify-center shadow-sm">
                   <MessageSquare className="w-5 h-5 text-white" />
                 </div>
-                <h1 className="font-bold text-base text-slate-900">CS Coach</h1>
-              </div>
-              <div className="hidden lg:flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-100/80 px-2.5 py-1 rounded-md">
-                  Yooga CS Coach
-                </span>
+                <h2 className="font-bold text-base text-slate-900">CS Coach</h2>
               </div>
             </div>
             
-            {/* Direita: Indicador de Sincronização + Sino de Notificações */}
+            {/* Portal de ações específicas da página */}
+            <div id="layout-header-actions" className="flex items-center gap-3"></div>
+            
+            {/* Direita: Sino de Notificações */}
             <div className="flex items-center gap-3.5">
-              <SyncStatusIndicator />
               <NotificationBell />
             </div>
           </header>

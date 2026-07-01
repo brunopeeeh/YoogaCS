@@ -13,7 +13,7 @@ scraped_at: "2026-05-22T01:47:06.812Z"
 
 [Imagem]
 
-Clique na opção **+NOVO PRODUTO** no canto superior direito da tela e selecione a opção **COMBO:
+Clique na opção **NOVO PRODUTO** no canto superior direito da tela e selecione a opção **COMBO:
 [Imagem]
 
 [Imagem]

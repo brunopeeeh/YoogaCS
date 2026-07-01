@@ -47,18 +47,20 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import Dashboard from './pages/Dashboard';
-import Scenarios from './pages/Scenarios';
-import Simulator from './pages/Simulator';
-import Reports from './pages/Reports';
-import Settings from './pages/Settings';
-import AdminDashboard from './pages/AdminDashboard';
-import ManageUsers from './pages/ManageUsers';
-import Login from './pages/Login';
-import Modules from './pages/Modules';
-import ModuleStudy from './pages/ModuleStudy';
-import ModuleQuiz from './pages/ModuleQuiz';
+import React, { lazy } from 'react';
 import __Layout from './Layout.jsx';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Scenarios = lazy(() => import('./pages/Scenarios'));
+const Simulator = lazy(() => import('./pages/Simulator'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Settings = lazy(() => import('./pages/Settings'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const ManageUsers = lazy(() => import('./pages/ManageUsers'));
+const Login = lazy(() => import('./pages/Login'));
+const Modules = lazy(() => import('./pages/Modules'));
+const ModuleStudy = lazy(() => import('./pages/ModuleStudy'));
+const ModuleQuiz = lazy(() => import('./pages/ModuleQuiz'));
 
 export const PAGES = {
     "Dashboard": Dashboard,

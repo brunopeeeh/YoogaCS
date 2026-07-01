@@ -28,9 +28,12 @@ export default function Scenarios() {
   });
   const userRole = user?.role || 'user'; // Derived from the central user context
 
+  const hasLoadedRef = React.useRef(false);
+
   useEffect(() => {
     // Only load scenarios once user data is available (not loading)
-    if (!isUserLoading) {
+    if (!isUserLoading && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
       loadScenarios();
 
       // Checar se veio query parameter para abrir o gerador de IA automaticamente
@@ -42,7 +45,7 @@ export default function Scenarios() {
         window.history.replaceState({}, document.title, newUrl);
       }
     }
-  }, [user, isUserLoading]); // Recarregar quando o usuário for definido ou o estado de carregamento mudar
+  }, [isUserLoading]); // Only depend on loading state, not user object reference
 
   const loadScenarios = async () => {
     setIsLoading(true);
@@ -118,7 +121,7 @@ export default function Scenarios() {
   // console.log("UserRole in Scenarios:", userRole); // Debug log
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-yooga-primary/5 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -144,7 +147,7 @@ export default function Scenarios() {
               </Button>
               <Button 
                 onClick={() => { setEditingScenario(null); setShowForm(true); }}
-                className="bg-[#002D62] hover:bg-[#004094] gap-2 h-12 px-6 shadow-lg rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold"
+                className="bg-primary hover:bg-yooga-primary-dark gap-2 h-12 px-6 shadow-lg rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold"
               >
                 <Plus className="w-5 h-5" />
                 Novo Cenário
@@ -253,7 +256,7 @@ export default function Scenarios() {
             {scenarios.length > 0 ? (
               <Button 
                 onClick={handleResetFilters}
-                className="bg-[#002D62] hover:bg-[#004094] gap-2 h-11 px-5 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-white font-bold inline-flex items-center cursor-pointer shadow-sm"
+                className="bg-primary hover:bg-yooga-primary-dark gap-2 h-11 px-5 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-white font-bold inline-flex items-center cursor-pointer shadow-sm"
               >
                 <X className="w-4 h-4" />
                 Limpar Filtros e Busca
@@ -262,7 +265,7 @@ export default function Scenarios() {
               userRole === 'admin' && (
                 <Button 
                   onClick={() => setShowForm(true)}
-                  className="bg-[#002D62] hover:bg-[#004094] rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold px-5 h-11 inline-flex items-center"
+                  className="bg-primary hover:bg-yooga-primary-dark rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer text-white font-bold px-5 h-11 inline-flex items-center"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Criar Primeiro Cenário

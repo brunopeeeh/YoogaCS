@@ -30,9 +30,14 @@ export function createLocalEntity(storageKey) {
       const desc = orderBy.startsWith('-');
       const field = orderBy.replace(/^-/, '');
       items = items.sort((a, b) => {
-        const va = a[field] ?? '';
-        const vb = b[field] ?? '';
-        return desc ? (va < vb ? 1 : -1) : (va > vb ? 1 : -1);
+        const va = a[field];
+        const vb = b[field];
+        if (typeof va === 'number' && typeof vb === 'number') {
+          return desc ? vb - va : va - vb;
+        }
+        const sa = va ?? '';
+        const sb = vb ?? '';
+        return desc ? (sa < sb ? 1 : -1) : (sa > sb ? 1 : -1);
       });
       return items;
     },
@@ -52,9 +57,14 @@ export function createLocalEntity(storageKey) {
       const desc = orderBy.startsWith('-');
       const field = orderBy.replace(/^-/, '');
       items = items.sort((a, b) => {
-        const va = a[field] ?? '';
-        const vb = b[field] ?? '';
-        return desc ? (va < vb ? 1 : -1) : (va > vb ? 1 : -1);
+        const va = a[field];
+        const vb = b[field];
+        if (typeof va === 'number' && typeof vb === 'number') {
+          return desc ? vb - va : va - vb;
+        }
+        const sa = va ?? '';
+        const sb = vb ?? '';
+        return desc ? (sa < sb ? 1 : -1) : (sa > sb ? 1 : -1);
       });
       return items.slice(0, limit);
     },

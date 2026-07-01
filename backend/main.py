@@ -4,7 +4,6 @@ import random
 import asyncio
 import time
 import re
-import functools
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
 from fastapi import FastAPI, HTTPException, Request
@@ -13,6 +12,7 @@ from pydantic import BaseModel, Field
 import google.generativeai as genai
 from dotenv import load_dotenv
 from openai import OpenAI
+import hashlib
 
 # Carregar variáveis de ambiente do diretório pai
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -20,8 +20,8 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 # Provedor ativo e chaves
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek").lower()
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-DEEPSEEK_REASONING_MODEL = os.getenv("DEEPSEEK_REASONING_MODEL", "deepseek-reasoning")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_REASONING_MODEL = os.getenv("DEEPSEEK_REASONING_MODEL", "deepseek-v4-pro")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
 
@@ -85,14 +85,22 @@ def supabase_request(table: str, method: str = "GET", body: Any = None, params: 
 
 
 def is_llm_available() -> bool:
-    """Verifica se há algum provedor de LLM configurado e ativo."""
-    if LLM_PROVIDER == "deepseek" and DEEPSEEK_API_KEY:
+    """Verifica se há algum provedor de LLM configurado e ativo, independente do provider ativo."""
+    if DEEPSEEK_API_KEY:
         return True
-    if LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
+    if GEMINI_API_KEY:
         return True
     return False
 
 from rag_engine import get_semantic_faq_context, generate_deterministic_vector, dot_product
+from prompt_templates import (
+    build_simulation_system_prompt,
+    build_coach_system_prompt,
+    get_client_profile_instructions,
+    get_typing_delay_ms,
+    get_nudge_message
+)
+from audit_engine import run_orchestrated_audit
 
 # Inicializar FastAPI
 app = FastAPI(
@@ -139,34 +147,6 @@ else:
 # Caminho para os embeddings do FAQ
 FAQ_PATH = os.path.join(os.path.dirname(__file__), "..", "src", "data", "faq-embeddings.json")
 
-# Caminho para o documento mãe do sistema Yooga
-_SYSTEM_DIR = os.path.join(os.path.dirname(__file__), "..", "src", "data", "knowledge-base", "_system")
-
-def _load_md(filename: str) -> str:
-    """Lê um .md de _system/, remove frontmatter e cacheia via lru_cache."""
-    path = os.path.join(_SYSTEM_DIR, filename)
-    try:
-        with open(path, encoding="utf-8") as f:
-            content = f.read()
-        if content.startswith("---"):
-            parts = content.split("---", 2)
-            if len(parts) >= 3:
-                content = parts[2].strip()
-        return content
-    except Exception as exc:
-        print(f"[Core Context] Aviso: {filename} não encontrado: {exc}")
-        return ""
-
-@functools.lru_cache(maxsize=1)
-def get_client_context() -> str:
-    """Contexto do cliente Yooga — injeta apenas no /simulate."""
-    return _load_md("yooga-client-context.md")
-
-@functools.lru_cache(maxsize=1)
-def get_agent_context() -> str:
-    """Contexto do agente CS — injeta em /coach, /audit e /scenarios."""
-    return _load_md("yooga-agent-context.md")
-
 # Modelos do Gemini para rotação automática contra limites de cota (429)
 MODEL_CHAIN = [
     "gemini-2.5-flash",
@@ -186,11 +166,17 @@ class SimulateRequest(BaseModel):
     history: List[Message]
     system_instruction: Optional[str] = None
     client_profile: Optional[str] = "irritado"
+    initial_problem: Optional[str] = ""
+    scenario_title: Optional[str] = ""
+    scenario_context: Optional[str] = None
+    expected_interactions: Optional[int] = 4
 
 class CoachRequest(BaseModel):
     prompt: str
     history: List[Message]
     system_instruction: Optional[str] = None
+    scenario_title: Optional[str] = ""
+    required_points_hint: Optional[str] = ""
 
 class AuditRequest(BaseModel):
     history: List[Message]
@@ -198,6 +184,15 @@ class AuditRequest(BaseModel):
     scenario_title: Optional[str] = ""
     system_instruction: Optional[str] = None
     prompt: Optional[str] = None
+    faq_context: Optional[str] = ""
+    checklist_section: Optional[str] = ""
+    common_mistakes_section: Optional[str] = ""
+    scoring_rules_section: Optional[str] = ""
+
+class NudgeRequest(BaseModel):
+    client_profile: str
+    history: List[Message]
+    scenario_title: Optional[str] = ""
 
 class GenerateScenarioRequest(BaseModel):
     prompt: str
@@ -212,6 +207,10 @@ class FilterRequest(BaseModel):
     orderBy: Optional[str] = "-created_date"
     limit: Optional[int] = 100
 
+class AuthLoginRequest(BaseModel):
+    email: str
+    password: str
+
 # ─── Middleware de segurança ──────────────────────────────────────────────────
 
 @app.middleware("http")
@@ -221,18 +220,41 @@ async def security_middleware(request: Request, call_next):
         return await call_next(request)
 
     if request.url.path.startswith("/api/"):
-        if BACKEND_API_KEY:
-            api_key = request.headers.get("X-API-Key", "")
-            if api_key != BACKEND_API_KEY:
-                raise HTTPException(status_code=401, detail="API key inválida ou ausente")
-
+        from fastapi.responses import JSONResponse
+        origin = request.headers.get("origin", "*")
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Headers": "Content-Type, X-API-Key, Authorization",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE, PATCH",
+        }
+        
+        # Rate-limiting primeiro — aplica a todas as requisições, inclusive com API key inválida
         client_ip = request.client.host if request.client else "unknown"
         now = time.time()
         timestamps = _rate_limit_store[client_ip]
         timestamps[:] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
-        if len(timestamps) >= RATE_LIMIT_MAX:
-            raise HTTPException(status_code=429, detail="Limite de requisições excedido. Tente novamente em breve.")
+        
+        # Relaxa o rate-limit para conexões locais (desenvolvimento e testes automatizados locais)
+        effective_limit = 600 if client_ip in ("127.0.0.1", "localhost", "::1", "unknown") else RATE_LIMIT_MAX
+        
+        if len(timestamps) >= effective_limit:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Limite de requisições excedido. Tente novamente em breve."},
+                headers=cors_headers
+            )
         timestamps.append(now)
+        
+        # Validação de API key depois do rate-limit
+        if BACKEND_API_KEY:
+            api_key = request.headers.get("X-API-Key", "")
+            if api_key != BACKEND_API_KEY:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "API key inválida ou ausente"},
+                    headers=cors_headers
+                )
 
     return await call_next(request)
 
@@ -262,51 +284,52 @@ def build_rag_query(prompt: str, history: List[Message]) -> str:
     lines = [l.strip() for l in prompt.split("\n") if l.strip()]
     return lines[-1] if lines else prompt.strip()
 
-# ─── Cache Semântico Local para o Coach ───────────────────────────────────────
+# ─── Cache Semântico Vetorial para o Coach ────────────────────────────────────
 
 import unicodedata
 
 def clean_text_for_cache(text: str) -> str:
-    # Normalizar diacríticos e acentos (ex: "faço" -> "faco")
+    """Normaliza diacríticos e acentos (ex: 'faço' -> 'faco') e converte para minúsculas."""
     nfd_form = unicodedata.normalize('NFD', text)
     cleaned = "".join(c for c in nfd_form if unicodedata.category(c) != 'Mn')
     return cleaned.lower()
 
 class SemanticCache:
-    def __init__(self, max_size: int = 100, threshold: float = 0.90):
+    """Cache semântico baseado em similaridade por cosseno (dot product de vetores normalizados).
+    
+    Substitui a abordagem anterior baseada em Jaccard (interseção de palavras), que falhava
+    em capturar paráfrases e sinônimos. Agora, mensagens como 'Como posso te ajudar?' e
+    'De que forma posso te ajudar?' retornam um HIT com score alto.
+    """
+    def __init__(self, max_size: int = 100, threshold: float = 0.85):
         self.max_size = max_size
         self.threshold = threshold
         self.entries: List[Dict[str, Any]] = []
 
-    def _get_words(self, text: str) -> set:
+    def _vectorize(self, text: str) -> List[float]:
         cleaned = clean_text_for_cache(text)
-        words = re.findall(r"\w+", cleaned)
-        return set(words)
+        return generate_deterministic_vector(cleaned)
 
     def get(self, query: str) -> Optional[Dict[str, Any]]:
         if not query or not query.strip():
             return None
         
-        query_words = self._get_words(query)
-        if not query_words:
+        if not self.entries:
             return None
+
+        query_vec = self._vectorize(query)
 
         best_score = -1.0
         best_entry = None
 
-        # Comparar similaridade Jaccard (conjuntos de palavras)
         for entry in self.entries:
-            cached_words = entry["words"]
-            intersection = query_words.intersection(cached_words)
-            union = query_words.union(cached_words)
-            if union:
-                score = len(intersection) / len(union)
-                if score > best_score:
-                    best_score = score
-                    best_entry = entry
+            score = dot_product(query_vec, entry["vector"])
+            if score > best_score:
+                best_score = score
+                best_entry = entry
 
         if best_entry and best_score >= self.threshold:
-            print(f"[Semantic Cache] HIT semântico perfeito! Jaccard Score: {best_score:.4f} (Economia de tokens!)")
+            print(f"[Semantic Cache] HIT vetorial! Cosine Score: {best_score:.4f} (Economia de tokens!)")
             return dict(best_entry["response"])
             
         return None
@@ -316,20 +339,20 @@ class SemanticCache:
             return
         
         try:
-            query_words = self._get_words(query)
+            query_vec = self._vectorize(query)
             if len(self.entries) >= self.max_size:
-                self.entries.pop(0) # FIFO Eviction
+                self.entries.pop(0)  # FIFO Eviction
                 
             self.entries.append({
                 "query": query,
-                "words": query_words,
+                "vector": query_vec,
                 "response": dict(response)
             })
             print(f"[Semantic Cache] Registrado com sucesso. Tamanho: {len(self.entries)}")
         except Exception as e:
             print(f"[Semantic Cache] Erro ao registrar no cache: {e}")
 
-coach_semantic_cache = SemanticCache(max_size=100, threshold=0.90)
+coach_semantic_cache = SemanticCache(max_size=100, threshold=0.85)
 
 # ─── Funções Auxiliares de LLM com Rotação de Modelos ────────────────────────
 
@@ -519,9 +542,9 @@ def invoke_deepseek_json(prompt: str, schema_dict: Dict[str, Any], system_instru
     # Decidir o modelo primário e o de fallback interno (Plano B)
     if model_type == "reasoning" and DEEPSEEK_REASONING_MODEL:
         primary_model = DEEPSEEK_REASONING_MODEL
-        fallback_model = DEEPSEEK_MODEL or "deepseek-chat"
+        fallback_model = DEEPSEEK_MODEL or "deepseek-v4-flash"
     else:
-        primary_model = DEEPSEEK_MODEL or "deepseek-chat"
+        primary_model = DEEPSEEK_MODEL or "deepseek-v4-flash"
         fallback_model = None
 
     schema_instruction = f"\nVocê DEVE retornar um objeto JSON que atenda rigorosamente ao seguinte JSON Schema:\n{json.dumps(schema_dict, ensure_ascii=False)}"
@@ -700,16 +723,14 @@ async def rag_search(req: RagSearchRequest):
     Busca semântica na base FAQ Yooga via Supabase pgvector (ou fallback local).
     Retorna contexto truncado para economizar tokens no prompt da IA.
     """
-    context = get_semantic_faq_context(req.query, FAQ_PATH)
-    source = "supabase" if context else "none"
-    try:
-        from supabase_rag import is_supabase_configured
-        if is_supabase_configured() and context:
-            source = "supabase"
-        elif context:
+    context = await asyncio.to_thread(get_semantic_faq_context, req.query, FAQ_PATH)
+    source = "none"
+    if context:
+        try:
+            from supabase_rag import is_supabase_configured
+            source = "supabase" if is_supabase_configured() else "local_json"
+        except ImportError:
             source = "local_json"
-    except ImportError:
-        source = "local_json" if context else "none"
 
     return {
         "context": context,
@@ -744,54 +765,88 @@ async def simulate_chat(req: SimulateRequest):
     """
     Simula a mensagem de resposta do cliente de suporte baseando-se no histórico estruturado,
     perfil psicológico do cliente e regras sazonais.
+    Prompts são construídos centralizadamente via prompt_templates.py.
     """
     rag_query = build_rag_query(req.prompt, req.history)
-    context = get_semantic_faq_context(rag_query, FAQ_PATH) if not req.system_instruction else ""
+    faq_context = get_semantic_faq_context(rag_query, FAQ_PATH) if not req.system_instruction else ""
 
     if not is_llm_available():
-        return {"response": get_mock_client_response(req.prompt, context, req.client_profile)}
+        return {"response": get_mock_client_response(req.prompt, faq_context, req.client_profile), "typing_delay_ms": 1500}
 
-    system_instruction = req.system_instruction or f"""
-    Você é um CLIENTE real de um restaurante (parceiro da Yooga) que está entrando em contato com o suporte da Yooga para resolver um problema urgente.
+    # Detectar condições de encerramento e primeira mensagem
+    agent_interactions = sum(1 for m in req.history if m.sender == "agent")
+    is_first_message = len(req.history) == 0
+    
+    # Detecção de encerramento baseada no histórico
+    should_force_ending = False
+    if agent_interactions >= 1 and not is_first_message:
+        keywords_map = {
+            "venda offline": ["salv", "navegador", "fech", "limp", "sincroniz", "off", "contingencia"],
+            "ifood": ["vinc", "categori", "sincroniz", "preço", "painel", "portal"],
+            "fiscal": ["csc", "sefaz", "produção", "certificado", "digital", "contador", "nfc"],
+            "nfc-e": ["csc", "sefaz", "produção", "certificado", "digital", "contador", "nfc"],
+            "impressora": ["largura", "bobina", "58mm", "margem", "margens", "horizontal"],
+            "pagamento": ["parcial", "adicionar", "dividir", "pix", "dinheiro", "fechamento"],
+            "segurança": ["cargo", "permissao", "senha", "cancelamento", "gerente", "administrador"],
+            "delivery": ["ajust", "configur", "habilit", "painel", "acompanh", "loja", "chat", "cliente"]
+        }
+        title_lower = (req.scenario_title or "").lower()
+        history_text = " ".join(m.message.lower() for m in req.history)
+        lower_prompt = req.prompt.lower() if req.prompt else ""
+        has_ending = any(kw in lower_prompt for kw in ["tchau", "abraco", "tarde", "finalizar", "concluir", "ajudar em algo", "disposicao"])
+        should_force_ending = agent_interactions >= (req.expected_interactions or 4) - 1 or has_ending
 
-    Sua identidade como cliente:
-    - Perfil Psicológico: {req.client_profile.upper()}. Incorpore fielmente este perfil (ex: se IRRITADO, use exclamações, demonstre pressa e frustração com o sistema; se CONFUSO, demonstre insegurança e peça explicações simples; se IMPACIENTE, mande mensagens curtas e diretas).
-    - Conhecimento Técnico: Baixo. Você é dono de restaurante ou operador de caixa, NÃO é profissional de TI. Não entende jargões de programação ou infraestrutura.
+    # Construir system instruction centralizado
+    if req.system_instruction:
+        system_instruction = req.system_instruction
+    else:
+        system_instruction = build_simulation_system_prompt(
+            client_profile=req.client_profile,
+            initial_problem=req.initial_problem or req.prompt,
+            faq_context=faq_context,
+            agent_interactions=agent_interactions,
+            is_first_message=is_first_message,
+            should_force_ending=should_force_ending,
+            scenario_context=req.scenario_context
+        )
 
-    Sua Base de Conhecimento Secreta (FAQ oficial da Yooga):
-    {context}
-
-    Instruções de Interação:
-    1. Você só ficará satisfeito e acalmado se o atendente da Yooga guiar você exatamente pelos passos corretos descritos no FAQ técnico acima.
-    2. Se o atendente der respostas vagas, genéricas, incompletas ou incorretas, demonstre frustração de acordo com seu perfil (continue reclamando, diga que não funcionou ou peça clareza).
-    3. Responda em português brasileiro coloquial, de forma direta e curta (evite parágrafos longos e robóticos). Nunca se comporte como uma inteligência artificial ou assistente.
-    """
-    _ctx = get_client_context()
-    if _ctx:
-        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
-
-    # Mapear o histórico de mensagens ativamente para papéis estruturados nativos (agent -> user, client -> assistant)
+    # Mapear histórico para papéis estruturados nativos (agent -> user, client -> assistant)
     chat_messages = []
     for msg in req.history:
         role = "user" if msg.sender == "agent" else "assistant"
         chat_messages.append({"role": role, "content": msg.message})
     
-    # Injetar a mensagem atual do atendente (agent) à qual a IA precisa responder
     if req.prompt:
         chat_messages.append({"role": "user", "content": req.prompt})
 
     response_text = await asyncio.to_thread(invoke_llm_chat, chat_messages, system_instruction)
 
     if not response_text:
-        response_text = get_mock_client_response(req.prompt, context, req.client_profile)
+        response_text = get_mock_client_response(req.prompt, faq_context, req.client_profile)
 
-    return {"response": response_text}
+    # Calcular delay de digitação baseado no perfil
+    typing_delay_ms = get_typing_delay_ms(req.client_profile, len(response_text))
+
+    return {"response": response_text, "typing_delay_ms": typing_delay_ms}
+
+
+@app.post("/api/chat/simulate/nudge")
+async def simulate_nudge(req: NudgeRequest):
+    """
+    Gera uma mensagem de "cobrança" do cliente quando o atendente demora para responder.
+    Usado para simular o comportamento real de WhatsApp (double-texting ativo).
+    """
+    nudge_msg = get_nudge_message(req.client_profile)
+    if nudge_msg is None:
+        return {"nudge": None, "should_nudge": False}
+    return {"nudge": nudge_msg, "should_nudge": True}
 
 @app.post("/api/chat/coach")
 async def coach_assistant(req: CoachRequest):
     """
     Retorna uma sugestão perfeita de resposta para o analista estruturada sob
     as 5 Regras de Ouro Yooga, acompanhada por justificativa pedagógica.
+    Prompts construídos centralizadamente via prompt_templates.py.
     """
     context = get_semantic_faq_context(build_rag_query(req.prompt, req.history), FAQ_PATH)
 
@@ -807,26 +862,16 @@ async def coach_assistant(req: CoachRequest):
     if not is_llm_available():
         return get_mock_coach_response(context)
 
+    # Construir system instruction centralizado
     if req.system_instruction:
         system_instruction = req.system_instruction
         if context and context not in system_instruction:
             system_instruction += f"\n\nContexto adicional do FAQ Yooga:\n{context}"
     else:
-        system_instruction = f"""
-    Você é o Yooga CS Coach, um mentor e instrutor sênior especialista em Customer Success da Yooga.
-    Sua função é auxiliar o atendente em tempo real durante o suporte ao cliente.
-
-    Seu objetivo:
-    Com base no histórico da conversa e no FAQ Yooga abaixo:
-    {context}
-
-    Forneça uma resposta sugerida de alta qualidade que o atendente possa usar imediatamente, além de uma justificativa pedagógica baseada nos 5 pilares do sucesso (Disponibilidade, Proatividade, Conhecimento Técnico, Empatia e Humor).
-
-    Retorne a resposta estritamente formatada no JSON requerido.
-    """
-    _ctx = get_agent_context()
-    if _ctx:
-        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
+        system_instruction = build_coach_system_prompt(
+            faq_context=context,
+            required_points_hint=req.required_points_hint or ""
+        )
 
     chat_history_str = ""
     for msg in req.history:
@@ -834,7 +879,7 @@ async def coach_assistant(req: CoachRequest):
         chat_history_str += f"{role_label}: {msg.message}\n"
     chat_history_str += f"Cliente (última mensagem): {req.prompt}\nSugira a melhor resposta do Atendente Yooga no formato JSON solicitado."
 
-    # 1. Tentar recuperar do Cache Semântico
+    # 1. Tentar recuperar do Cache Semântico Vetorial
     cached_response = coach_semantic_cache.get(chat_history_str)
     if cached_response:
         return cached_response
@@ -845,7 +890,6 @@ async def coach_assistant(req: CoachRequest):
     if not validate_coach_response(parsed_json):
         parsed_json = get_mock_coach_response(context)
     else:
-        # Registrar no cache apenas se for uma resposta real válida
         clean_cache_item = dict(parsed_json)
         clean_cache_item.pop("_thinking_log", None)
         coach_semantic_cache.set(chat_history_str, clean_cache_item)
@@ -856,30 +900,9 @@ async def coach_assistant(req: CoachRequest):
 @app.post("/api/chat/audit")
 async def audit_chat(req: AuditRequest):
     """
-    Avalia a simulação de chat concluída, atribuindo notas individuais de 0 a 100
-    para cada um dos 5 Pilares Yooga, gerando uma nota consolidada e feedbacks detalhados.
+    Avalia a simulação de chat concluída usando Auditoria Multi-Agente Orquestrada.
+    3 agentes paralelos (Técnico + Empatia + Consolidador) para avaliação mais precisa.
     """
-    schema = {
-        "type": "object",
-        "properties": {
-            "overall_score": {"type": "integer"},
-            "empathy_score": {"type": "integer"},
-            "resolution_score": {"type": "integer"},
-            "professionalism_score": {"type": "integer"},
-            "agility_score": {"type": "integer"},
-            "feedback": {"type": "string"},
-            "strengths": {"type": "array", "items": {"type": "string"}},
-            "improvements": {"type": "array", "items": {"type": "string"}},
-            "weak_areas": {"type": "array", "items": {"type": "string"}},
-            "recommended_training_topics": {"type": "array", "items": {"type": "string"}}
-        },
-        "required": [
-            "overall_score", "empathy_score", "resolution_score", 
-            "professionalism_score", "agility_score", "feedback", 
-            "strengths", "improvements", "weak_areas", "recommended_training_topics"
-        ]
-    }
-    
     if not is_llm_available():
         return get_dynamic_offline_audit(req.history, req.goals)
 
@@ -937,16 +960,25 @@ async def audit_chat(req: AuditRequest):
     if _ctx:
         system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
 
+    # Construir transcrição formatada
     chat_history_str = ""
     for msg in req.history:
         role_label = "Atendente (Yooga CS)" if msg.sender == "agent" else "Cliente"
         chat_history_str += f"{role_label}: {msg.message}\n"
-
     if req.prompt:
         chat_history_str += f"\n{req.prompt}\n"
-    chat_history_str += "\nAvalie esta conversa e retorne a auditoria completa formatada no JSON requerido."
 
-    parsed_json = await asyncio.to_thread(invoke_llm_json, chat_history_str, schema, system_instruction, "reasoning")
+    # Executar auditoria multi-agente orquestrada
+    parsed_json = await run_orchestrated_audit(
+        history_str=chat_history_str,
+        goals=req.goals or [],
+        scenario_title=req.scenario_title or "",
+        faq_context=req.faq_context or "",
+        checklist_section=req.checklist_section or "",
+        common_mistakes_section=req.common_mistakes_section or "",
+        scoring_rules_section=req.scoring_rules_section or "",
+        invoke_llm_json_fn=invoke_llm_json
+    )
 
     if not validate_audit_response(parsed_json):
         parsed_json = get_dynamic_offline_audit(req.history, req.goals)
@@ -957,7 +989,6 @@ async def audit_chat(req: AuditRequest):
         os.makedirs(dir_path, exist_ok=True)
         log_file_path = os.path.join(dir_path, "chat_logs.jsonl")
         
-        # Extrair metadado de raciocínio se houver e remover do payload limpo enviado ao usuário
         thinking_log = parsed_json.pop("_thinking_log", None)
         
         log_entry = {
@@ -977,7 +1008,7 @@ async def audit_chat(req: AuditRequest):
         
         with open(log_file_path, "a", encoding="utf-8") as lf:
             lf.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
-        print(f"[Yooga API] OK - Historico de simulacao com thinking log salvo em: {log_file_path}")
+        print(f"[Yooga API] OK - Historico de simulacao com auditoria multi-agente salvo em: {log_file_path}")
     except Exception as log_err:
         print(f"[Yooga API] Erro ao salvar histórico de simulação para treino: {log_err}")
         
@@ -1038,9 +1069,6 @@ async def generate_scenario(req: GenerateScenarioRequest):
     
     Retorne APENAS um objeto JSON válido conforme o schema solicitado, em português brasileiro.
     """
-    _ctx = get_agent_context()
-    if _ctx:
-        system_instruction = f"{_ctx}\n\n---\n\n{system_instruction}"
 
     parsed_json = await asyncio.to_thread(invoke_llm_json, req.prompt, schema, system_instruction)
 
@@ -1309,6 +1337,137 @@ def get_table_name(entity_name: str) -> str:
     }
     return mapping.get(entity_name, entity_name)
 
+def map_db_to_js(entity: str, data: Any) -> Any:
+    if not data:
+        return data
+        
+    def map_item(item: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(item, dict):
+            return item
+            
+        item = dict(item)
+            
+        if entity == "db_users":
+            item.pop("password", None)
+            
+        elif entity == "db_scenarios":
+            if "module_id" in item:
+                item["moduleId"] = item.pop("module_id")
+                
+        elif entity == "db_simulations":
+            if "history" in item:
+                item["messages"] = item.pop("history")
+            if "audit_results" in item:
+                item["evaluation"] = item.pop("audit_results")
+            
+            # Reconstruct duration_minutes and suggestions_used from evaluation for the frontend
+            if "evaluation" in item and isinstance(item["evaluation"], dict):
+                item["duration_minutes"] = item["evaluation"].get("duration_minutes", 0)
+                item["suggestions_used"] = item["evaluation"].get("suggestions_used", 0)
+                
+        elif entity == "db_agent_performances":
+            if "badges" in item and isinstance(item["badges"], dict):
+                js_data = item["badges"]
+                item["agent_email"] = js_data.get("agent_email")
+                item["weak_areas"] = js_data.get("weak_areas")
+                item["strong_areas"] = js_data.get("strong_areas")
+                item["last_analysis_date"] = js_data.get("last_analysis_date")
+                item["recommended_scenarios"] = js_data.get("recommended_scenarios")
+                
+        return item
+
+    if isinstance(data, list):
+        return [map_item(x) for x in data]
+    return map_item(data)
+
+
+def map_js_to_db(entity: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(data, dict):
+        return data
+        
+    mapped = dict(data)
+    
+    if entity == "db_scenarios":
+        if "moduleId" in mapped:
+            mapped["module_id"] = mapped.pop("moduleId")
+            
+    elif entity == "db_simulations":
+        if "messages" in mapped:
+            mapped["history"] = mapped.pop("messages")
+        if "evaluation" in mapped:
+            mapped["audit_results"] = mapped.pop("evaluation")
+            
+        # Pop non-SQL fields so they don't break PostgREST on Supabase
+        duration_minutes = mapped.pop("duration_minutes", None)
+        suggestions_used = mapped.pop("suggestions_used", None)
+        
+        # Store duration_minutes and suggestions_used inside audit_results (JSONB)
+        if "audit_results" not in mapped or not isinstance(mapped["audit_results"], dict):
+            mapped["audit_results"] = {}
+            
+        if duration_minutes is not None:
+            mapped["audit_results"]["duration_minutes"] = duration_minutes
+        if suggestions_used is not None:
+            mapped["audit_results"]["suggestions_used"] = suggestions_used
+            
+        # Lookup agent_id from users table if not provided
+        if "agent_id" not in mapped or not mapped["agent_id"]:
+            agent_email = mapped.get("created_by", "")
+            if agent_email and "@" in agent_email:
+                try:
+                    user_res = supabase_request("users", "GET", params={"email": f"eq.{agent_email.lower()}"})
+                    if user_res and len(user_res) > 0:
+                        mapped["agent_id"] = user_res[0]["id"]
+                except Exception as e:
+                    print(f"[Yooga API Mapping] Erro ao buscar agent_id por e-mail: {e}")
+            if "agent_id" not in mapped or not mapped["agent_id"]:
+                mapped["agent_id"] = "local"
+                
+        # Lookup scenario_title from scenarios table if not provided
+        if "scenario_title" not in mapped or not mapped["scenario_title"]:
+            scenario_id = mapped.get("scenario_id")
+            if scenario_id:
+                try:
+                    scen_res = supabase_request("scenarios", "GET", params={"id": f"eq.{scenario_id}"})
+                    if scen_res and len(scen_res) > 0:
+                        mapped["scenario_title"] = scen_res[0]["title"]
+                except Exception as e:
+                    print(f"[Yooga API Mapping] Erro ao buscar scenario_title por id: {e}")
+            if "scenario_title" not in mapped or not mapped["scenario_title"]:
+                mapped["scenario_title"] = "Cenário de Atendimento"
+                
+    elif entity == "db_agent_performances":
+        # Resolve agent_id from agent_email (users table lookup)
+        agent_email = mapped.get("agent_email", "")
+        if agent_email and "@" in agent_email:
+            try:
+                user_res = supabase_request("users", "GET", params={"email": f"eq.{agent_email.lower()}"})
+                if user_res and len(user_res) > 0:
+                    mapped["agent_id"] = user_res[0]["id"]
+            except Exception as e:
+                print(f"[Yooga API Mapping] Erro ao buscar agent_id para performance: {e}")
+        if "agent_id" not in mapped or not mapped["agent_id"]:
+            mapped["agent_id"] = "local"
+            
+        # Store JS fields inside badges
+        js_data = {
+            "agent_email": mapped.get("agent_email"),
+            "weak_areas": mapped.get("weak_areas"),
+            "strong_areas": mapped.get("strong_areas"),
+            "last_analysis_date": mapped.get("last_analysis_date"),
+            "recommended_scenarios": mapped.get("recommended_scenarios")
+        }
+        mapped["badges"] = js_data
+        
+        # Remove JS fields that are not in SQL table schema
+        mapped.pop("agent_email", None)
+        mapped.pop("weak_areas", None)
+        mapped.pop("strong_areas", None)
+        mapped.pop("last_analysis_date", None)
+        mapped.pop("recommended_scenarios", None)
+        
+    return mapped
+
 @app.get("/api/db/{entity}")
 async def db_list(entity: str, orderBy: Optional[str] = "-created_date"):
     try:
@@ -1321,14 +1480,7 @@ async def db_list(entity: str, orderBy: Optional[str] = "-created_date"):
         
         params = {"order": f"{field}.{order_direction}"}
         res = supabase_request(table, "GET", params=params)
-        
-        # Mapeamento de volta para o frontend
-        if entity == "db_scenarios" and isinstance(res, list):
-            for item in res:
-                if "module_id" in item:
-                    item["moduleId"] = item.pop("module_id")
-                    
-        return res
+        return map_db_to_js(entity, res)
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -1362,14 +1514,7 @@ async def db_filter(entity: str, req: FilterRequest):
                     params[db_key] = f"eq.{v}"
                     
         res = supabase_request(table, "GET", params=params)
-        
-        # Mapeamento de volta para o frontend
-        if entity == "db_scenarios" and isinstance(res, list):
-            for item in res:
-                if "module_id" in item:
-                    item["moduleId"] = item.pop("module_id")
-                    
-        return res
+        return map_db_to_js(entity, res)
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -1382,10 +1527,7 @@ async def db_get(entity: str, item_id: str):
         params = {"id": f"eq.{item_id}"}
         res = supabase_request(table, "GET", params=params)
         if res and len(res) > 0:
-            item = res[0]
-            if entity == "db_scenarios" and "module_id" in item:
-                item["moduleId"] = item.pop("module_id")
-            return item
+            return map_db_to_js(entity, res[0])
         raise HTTPException(status_code=404, detail="Item não encontrado")
     except HTTPException as he:
         raise he
@@ -1395,18 +1537,15 @@ async def db_get(entity: str, item_id: str):
 @app.post("/api/db/{entity}")
 async def db_create(entity: str, data: Dict[str, Any]):
     try:
+        if not isinstance(data, dict) or not data:
+            raise HTTPException(status_code=400, detail="Corpo da requisição deve ser um dicionário não-vazio")
         table = get_table_name(entity)
-        
-        # Mapeamento de camelCase para snake_case
-        if entity == "db_scenarios" and "moduleId" in data:
-            data["module_id"] = data.pop("moduleId")
-            
-        res = supabase_request(table, "POST", body=data)
+        if entity not in ("db_users", "db_scenarios", "db_simulations", "db_company_profiles", "db_agent_performances"):
+            raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
+        db_data = map_js_to_db(entity, data)
+        res = supabase_request(table, "POST", body=db_data)
         if res and len(res) > 0:
-            item = res[0]
-            if entity == "db_scenarios" and "module_id" in item:
-                item["moduleId"] = item.pop("module_id")
-            return item
+            return map_db_to_js(entity, res[0])
         raise HTTPException(status_code=500, detail="Erro ao criar registro")
     except HTTPException as he:
         raise he
@@ -1416,24 +1555,22 @@ async def db_create(entity: str, data: Dict[str, Any]):
 @app.put("/api/db/{entity}/{item_id}")
 async def db_update(entity: str, item_id: str, data: Dict[str, Any]):
     try:
+        if not isinstance(data, dict) or not data:
+            raise HTTPException(status_code=400, detail="Corpo da requisição deve ser um dicionário não-vazio")
+        if entity not in ("db_users", "db_scenarios", "db_simulations", "db_company_profiles", "db_agent_performances"):
+            raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
         table = get_table_name(entity)
         data.pop("created_date", None)
+        db_data = map_js_to_db(entity, data)
         
-        # Mapeamento de camelCase para snake_case
-        if entity == "db_scenarios" and "moduleId" in data:
-            data["module_id"] = data.pop("moduleId")
-            
         # updated_date pode ser atualizada via backend
         import datetime
-        data["updated_date"] = datetime.datetime.utcnow().isoformat() + "Z"
+        db_data["updated_date"] = datetime.datetime.utcnow().isoformat() + "Z"
         
         params = {"id": f"eq.{item_id}"}
-        res = supabase_request(table, "PATCH", body=data, params=params)
+        res = supabase_request(table, "PATCH", body=db_data, params=params)
         if res and len(res) > 0:
-            item = res[0]
-            if entity == "db_scenarios" and "module_id" in item:
-                item["moduleId"] = item.pop("module_id")
-            return item
+            return map_db_to_js(entity, res[0])
         raise HTTPException(status_code=404, detail="Item não encontrado para atualização")
     except HTTPException as he:
         raise he
@@ -1443,6 +1580,8 @@ async def db_update(entity: str, item_id: str, data: Dict[str, Any]):
 @app.delete("/api/db/{entity}/{item_id}")
 async def db_delete(entity: str, item_id: str):
     try:
+        if entity not in ("db_users", "db_scenarios", "db_simulations", "db_company_profiles", "db_agent_performances"):
+            raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
         table = get_table_name(entity)
         params = {"id": f"eq.{item_id}"}
         supabase_request(table, "DELETE", params=params)
@@ -1451,6 +1590,40 @@ async def db_delete(entity: str, item_id: str):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao deletar item: {e}")
+
+
+@app.post("/api/auth/login")
+async def auth_login(req: AuthLoginRequest):
+    try:
+        table = get_table_name("db_users")
+        params = {"email": f"eq.{req.email.strip().lower()}"}
+        users = supabase_request(table, "GET", params=params)
+        if not users or len(users) == 0:
+            raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+
+        user = users[0]
+        hashed_input = hashlib.sha256(req.password.encode()).hexdigest()
+        stored_hash = user.get("password", "")
+
+        is_match = stored_hash == hashed_input
+        if not is_match and stored_hash == req.password:
+            is_match = True
+            supabase_request(table, "PATCH", body={"password": hashed_input}, params={"id": f"eq.{user['id']}"})
+
+        if not is_match:
+            raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+
+        return {
+            "id": user["id"],
+            "full_name": user["full_name"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao autenticar: {e}")
+
 
 if __name__ == "__main__":
     import uvicorn

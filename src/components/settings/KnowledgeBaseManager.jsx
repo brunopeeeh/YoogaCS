@@ -167,6 +167,7 @@ export default function KnowledgeBaseManager({ files = [], onUpdate }) {
                 {tag}
                 <button
                   onClick={() => removeCustomTag(tag)}
+                  aria-label="Remover tag"
                   className="ml-1 hover:text-red-600"
                 >
                   <X className="w-3 h-3" />
@@ -184,10 +185,10 @@ export default function KnowledgeBaseManager({ files = [], onUpdate }) {
                 className="flex-1"
                 onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
               />
-              <Button onClick={addCustomTag} size="sm">
+              <Button onClick={addCustomTag} size="sm" aria-label="Confirmar nova tag">
                 <Plus className="w-4 h-4" />
               </Button>
-              <Button onClick={() => setShowAddTag(false)} variant="outline" size="sm">
+              <Button onClick={() => setShowAddTag(false)} variant="outline" size="sm" aria-label="Cancelar nova tag">
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -222,7 +223,7 @@ export default function KnowledgeBaseManager({ files = [], onUpdate }) {
             />
           </div>
           {isUploading && (
-            <div className="flex items-center gap-2 mt-2 text-sm text-blue-600">
+            <div className="flex items-center gap-2 mt-2 text-sm text-blue-600" role="status" aria-live="polite">
               <Loader2 className="w-4 h-4 animate-spin" />
               Enviando arquivos...
             </div>
@@ -303,6 +304,7 @@ export default function KnowledgeBaseManager({ files = [], onUpdate }) {
                           <Button
                             size="sm"
                             variant="ghost"
+                            aria-label="Editar tags do arquivo"
                             onClick={() => startEditingFile(index)}
                             className="text-slate-500 hover:text-blue-600"
                           >
@@ -311,6 +313,7 @@ export default function KnowledgeBaseManager({ files = [], onUpdate }) {
                           <Button
                             size="sm"
                             variant="ghost"
+                            aria-label="Excluir arquivo"
                             onClick={() => removeFile(index)}
                             className="text-slate-500 hover:text-red-600"
                           >

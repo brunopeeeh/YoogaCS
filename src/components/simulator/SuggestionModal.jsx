@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,14 @@ import { Lightbulb, Check, Copy, X } from "lucide-react";
 
 export default function SuggestionModal({ suggestionData, onClose, onUseSuggestion }) {
   const [copied, setCopied] = React.useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(suggestionData.suggested_response);
@@ -20,6 +28,9 @@ export default function SuggestionModal({ suggestionData, onClose, onUseSuggesti
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="suggestion-modal-title"
     >
       <motion.div
         initial={{ scale: 0.9, y: 20 }}
@@ -30,9 +41,9 @@ export default function SuggestionModal({ suggestionData, onClose, onUseSuggesti
       >
         <Card className="w-full bg-white shadow-2xl rounded-2xl border-slate-200/80">
           <CardHeader className="border-b border-slate-100 p-6">
-            <CardTitle className="flex items-center gap-3 text-xl font-bold text-slate-900">
+            <CardTitle id="suggestion-modal-title" className="flex items-center gap-3 text-xl font-bold text-slate-900">
               <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-center">
-                <Lightbulb className="w-5 h-5 text-[#FF6600]" />
+                <Lightbulb className="w-5 h-5 text-yooga-accent" />
               </div>
               Sugestão do Coach de IA
             </CardTitle>
@@ -45,6 +56,7 @@ export default function SuggestionModal({ suggestionData, onClose, onUseSuggesti
                 <Button 
                   size="icon" 
                   variant="ghost" 
+                  aria-label="Copiar resposta sugerida"
                   className="absolute top-2 right-2 h-7 w-7 hover:bg-slate-200/60 rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
                   onClick={handleCopy}
                 >
@@ -54,7 +66,7 @@ export default function SuggestionModal({ suggestionData, onClose, onUseSuggesti
             </div>
             <div>
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Justificativa do Coach:</h3>
-              <p className="text-sm text-slate-700 p-4 bg-blue-50/50 rounded-xl border border-blue-100/60 leading-relaxed">
+              <p className="text-sm text-slate-700 p-4 bg-sky-50/50 rounded-xl border border-sky-100/60 leading-relaxed">
                 {suggestionData.reasoning}
               </p>
             </div>
@@ -70,7 +82,7 @@ export default function SuggestionModal({ suggestionData, onClose, onUseSuggesti
             </Button>
             <Button 
               onClick={() => onUseSuggestion(suggestionData.suggested_response)} 
-              className="bg-[#002D62] hover:bg-[#004094] text-white rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer shadow-sm shadow-blue-900/10"
+              className="bg-yooga-primary hover:bg-yooga-primary-dark text-white rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer shadow-sm shadow-yooga-primary/10"
             >
               <Check className="w-4 h-4 mr-2" />
               Usar esta Resposta
