@@ -101,10 +101,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Permitir CORS para o frontend em Vite (normalmente http://localhost:5173)
+# CORS: aceita Vercel, localhost em qualquer porta, e origens extras via env
+_extra_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+ALLOWED_ORIGINS = [
+    "https://yooga-training.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+] + _extra_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -879,31 +888,50 @@ async def audit_chat(req: AuditRequest):
     else:
         goals_formatted = "\n".join(f"- {g}" for g in req.goals) if req.goals else "- Solucionar o problema relatado com base no FAQ Yooga."
         system_instruction = f"""
-    Você é um Auditor de Qualidade Sênior e rigoroso de Customer Success na Yooga.
-    Sua missão é avaliar detalhadamente a transcrição do atendimento que acabou de ser concluído.
+    Você é um Auditor de Qualidade Sênior de Customer Success na Yooga.
+    Sua missão é avaliar detalhadamente a transcrição do atendimento com base nas diretrizes da marca.
 
-    Seus critérios de avaliação (as 5 Regras de Ouro Yooga):
-    - Empatia (empathy_score): O analista acolheu o cliente, demonstrou escuta ativa e humanização?
-    - Resolução/Conhecimento Técnico (resolution_score): O analista resolveu o problema de forma correta, guiando o cliente exatamente pelos caminhos e termos do FAQ correspondente?
-    - Profissionalismo/Tom de Voz (professionalism_score): O analista manteve a compostura, usou linguagem adequada e emojis equilibrados?
-    - Agilidade/Foco (agility_score): O analista respondeu com clareza, evitando enrolação ou mensagens desnecessárias?
+    ━━━ CRITÉRIOS DE AVALIAÇÃO ━━━
 
-    Objetivos que deveriam ser atingidos pelo Atendente neste cenário:
+    **Empatia (empathy_score)**
+    O analista acolheu o cliente ANTES de dar a solução técnica? Reconheceu o momento do cliente (rush, impressora travada, stress)? Usou escuta ativa? Humanizou o contato?
+
+    **Resolução/Conhecimento Técnico (resolution_score)**
+    Resolveu o problema corretamente com base no FAQ Yooga? Guiou pelos caminhos de menu exatos? Não inventou passos? Antecipou próximas dúvidas (proatividade)?
+
+    **Tom de Voz Yooga (professionalism_score)** ← critério principal desta avaliação
+    O analista seguiu o Jeito Yooga de se comunicar? Avalie POSITIVAMENTE se o atendente:
+    - Foi amigável, caloroso e descontraído (arquétipo do amigo)
+    - Usou linguagem simples, frases curtas, sem termos técnicos excessivos
+    - Usou emojis com equilíbrio
+    - Usou palavras no diminutivo (minutinhos, rapidinho) quando pertinente
+    - Se comunicou em primeira pessoa do plural (nosso sistema, estamos aqui)
+    - NÃO usou gerundismo ("vamos estar fazendo" → erro grave, penalizar)
+    - NÃO foi frio, robótico ou padronizado demais
+    - NÃO usou CAPS LOCK
+    - NÃO culpou o cliente
+    IMPORTANTE: ser informal, usar emojis e diminutivos é CORRETO no padrão Yooga — não penalizar por isso.
+
+    **Agilidade/Foco (agility_score)**
+    Respondeu com clareza e objetividade? Evitou enrolação? Informou o cliente sobre o que estava fazendo quando precisou de tempo?
+
+    ━━━ OBJETIVOS DO CENÁRIO ━━━
     {goals_formatted}
 
-    INSTRUÇÕES CRÍTICAS PARA OS PONTOS FORTES E DE MELHORIA:
-    1. Na lista "strengths" (pontos fortes), liste obrigatoriamente de 2 a 4 pontos específicos nos quais o analista se destacou na conversa (ex: uso de termos corretos do FAQ, tom acolhedor no início, excelente tratativa). Se o atendimento foi bom (nota acima de 70%), esta lista NUNCA deve vir vazia!
-    2. Na lista "improvements" (áreas de melhoria), você deve listar apenas críticas construtivas e pontos que ele errou ou pode aprimorar.
-    3. Se o atendimento foi excelente (nota acima de 90%) and não houver pontos reais a melhorar, você DEVE retornar a lista de melhorias vazia [] ou apenas com ["Manter a excelente qualidade de atendimento"].
-    4. NUNCA coloque elogios ou afirmações de maestria (como "não há pontos significativos de melhoria" ou "demonstrou maestria") dentro do campo "improvements"! Todos os elogios, pontos positivos e reconhecimentos de maestria pertencem EXCLUSIVAMENTE ao campo "strengths".
+    ━━━ INSTRUÇÕES PARA STRENGTHS E IMPROVEMENTS ━━━
+    1. "strengths": liste de 2 a 4 pontos específicos onde o analista se destacou. Se nota > 70, NUNCA deixe vazio.
+    2. "improvements": apenas críticas construtivas e erros reais. Seja específico — mencione o que exatamente poderia ser feito diferente seguindo o Tom de Voz Yooga.
+    3. Se nota > 90 e sem erros reais: improvements pode ser [] ou ["Manter a excelente qualidade de atendimento"].
+    4. NUNCA coloque elogios dentro de "improvements". Elogios vão EXCLUSIVAMENTE em "strengths".
+    5. Um atendimento bom não precisa ser perfeito — reconheça os acertos mesmo quando há melhorias pontuais.
 
-    ATENÇÃO EXTREMA E CRÍTICA:
-    Se você notar que a conversa não possui NENHUMA resposta do "Atendente (Yooga CS)" (o analista simplesmente finalizou a simulação sem enviar nenhuma mensagem ao cliente):
-    - Você DEVE pontuar 0 (ZERO) em todas as notas (overall_score, empathy_score, resolution_score, professionalism_score, agility_score).
-    - No campo "feedback", descreva com clareza que o atendimento foi abandonado ou não iniciado pelo analista.
-    - Coloque na lista de "improvements" a obrigatoriedade de interagir com o cliente.
+    ━━━ ATENÇÃO CRÍTICA ━━━
+    Se não houver NENHUMA mensagem do Atendente (Yooga CS):
+    - Zerar TODAS as notas (0).
+    - Descrever no feedback que o atendimento foi abandonado.
+    - Colocar em improvements: "Interagir com o cliente durante o atendimento".
 
-    Se houver interações, faça uma análise criteriosa e realista. Seja honesto e não dê notas infladas (uma nota 100 deve ser extremamente rara e perfeita).
+    Seja honesto e criterioso. Nota 100 é extremamente rara. Atendimentos bons ficam entre 75–90.
     """
     _ctx = get_agent_context()
     if _ctx:
@@ -1024,6 +1052,62 @@ async def generate_scenario(req: GenerateScenarioRequest):
 
     parsed_json.setdefault("status", "ativo")
     return parsed_json
+
+# ─── Admin: leitura e edição do contexto do agente ───────────────────────────
+
+_AGENT_CONTEXT_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "src", "data", "knowledge-base", "_system", "yooga-agent-context.md"
+)
+
+@app.get("/api/admin/context")
+async def get_admin_context():
+    """Retorna o conteúdo atual do yooga-agent-context.md."""
+    try:
+        with open(_AGENT_CONTEXT_PATH, encoding="utf-8") as f:
+            return {"content": f.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao ler arquivo: {e}")
+
+class AdminContextPatch(BaseModel):
+    content: str
+    push: bool = False  # False = só salva localmente; True = salva + git commit + push
+    commit_message: str = "fix: ajuste de critérios de avaliação via painel admin"
+
+@app.patch("/api/admin/context")
+async def patch_admin_context(body: AdminContextPatch):
+    """Salva o conteúdo editado e, opcionalmente, faz git commit + push."""
+    import subprocess
+
+    try:
+        with open(_AGENT_CONTEXT_PATH, "w", encoding="utf-8") as f:
+            f.write(body.content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo: {e}")
+
+    # Invalida o cache para recarregar na próxima chamada
+    get_agent_context.cache_clear()
+
+    if not body.push:
+        return {"saved": True, "pushed": False, "git_log": []}
+
+    # Git: commit + push (força add mesmo se gitignored)
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    git_log = []
+    try:
+        subprocess.run(["git", "add", "-f", _AGENT_CONTEXT_PATH], cwd=repo_root, check=True, capture_output=True)
+        result = subprocess.run(
+            ["git", "commit", "-m", body.commit_message],
+            cwd=repo_root, capture_output=True, text=True
+        )
+        git_log.append(result.stdout.strip() or result.stderr.strip())
+        push_result = subprocess.run(["git", "push"], cwd=repo_root, capture_output=True, text=True)
+        git_log.append(push_result.stdout.strip() or push_result.stderr.strip())
+        pushed = push_result.returncode == 0
+    except Exception as e:
+        git_log.append(str(e))
+        pushed = False
+
+    return {"saved": True, "pushed": pushed, "git_log": git_log}
 
 # ─── Fallbacks Locais (Sem API Key) ──────────────────────────────────────────
 
@@ -1147,12 +1231,17 @@ def get_dynamic_offline_audit(history: List[Message], goals: List[str]) -> Dict[
     empathy_matches = sum(1 for kw in empathy_kws if any(kw in msg for msg in agent_msgs))
     empathy_score = min(60 + empathy_matches * 10, 100)
 
-    # Profissionalismo (Grammar, formal terms, emojis count)
-    professionalism_score = 85
-    if len([msg for msg in agent_msgs if len(msg) > 100]) > 0:
-        professionalism_score = 95
-    if any(any(bad in msg for bad in ["porra", "merda", "burro", "sei lá", "não sei"]) for msg in agent_msgs):
+    # Tom de Voz Yooga — avalia aderência ao arquétipo do amigo
+    professionalism_score = 80
+    all_agent_text = " ".join(agent_msgs)
+    tone_positives = ["😊", "😄", "minutinhos", "rapidinho", "olhadinha", "nosso", "estamos", "vamos", "tá", "né", "obrigad"]
+    tone_negatives = ["vamos estar", "iremos estar", "estaremos"]  # gerundismo proibido
+    bad_words = ["porra", "merda", "burro", "sei lá", "não sei"]
+    professionalism_score += min(sum(1 for t in tone_positives if t in all_agent_text) * 3, 15)
+    professionalism_score -= sum(5 for t in tone_negatives if t in all_agent_text)
+    if any(b in all_agent_text for b in bad_words):
         professionalism_score = 30
+    professionalism_score = max(0, min(professionalism_score, 100))
 
     # Agilidade (Inversa do número de rodadas do atendente: menos rodadas = mais ágil)
     if len(agent_msgs) <= 1:
@@ -1174,17 +1263,24 @@ def get_dynamic_offline_audit(history: List[Message], goals: List[str]) -> Dict[
     improvements = []
     
     if overall_score >= 80:
-        feedback += "Excelente postura! Demonstrou ótimo domínio técnico e tratativa muito acolhedora com o cliente."
-        strengths.append("Ótimo tom de voz e empatia")
+        feedback += "Excelente postura! Tom de voz alinhado ao Jeito Yooga, empatia presente e domínio técnico demonstrado."
+        strengths.append("Tom de voz caloroso e alinhado ao arquétipo do amigo Yooga")
         strengths.append("Domínio dos procedimentos descritos no FAQ")
+        if empathy_score >= 80:
+            strengths.append("Acolhimento do cliente antes de entregar a solução técnica")
     elif overall_score >= 60:
-        feedback += "Bom atendimento, mas há pontos a refinar. Certifique-se de dar o caminho exato do menu no FAQ."
-        strengths.append("Respostas claras")
-        improvements.append("Guiar o cliente de forma mais passo a passo com o menu exato")
+        feedback += "Bom atendimento! Há pontos pontuais a refinar, mas a base está correta."
+        strengths.append("Comunicação clara e objetiva")
+        if professionalism_score >= 75:
+            strengths.append("Tom de voz adequado ao padrão Yooga")
+        improvements.append("Guiar o cliente passo a passo com o caminho exato do menu no sistema")
+        if empathy_score < 70:
+            improvements.append("Acolher o momento do cliente antes de entregar a solução técnica (ex.: 'Entendi! Minutinhos 😊')")
     else:
-        feedback += "O atendimento precisa de melhorias. Tente acolher melhor a frustração do cliente e dar instruções técnicas mais precisas."
-        improvements.append("Dedicar mais tempo para acalmar o cliente no início")
-        improvements.append("Estudar o FAQ correspondente para guiar o cliente de forma correta")
+        feedback += "O atendimento precisa de ajustes. Foque em acolher o cliente antes de resolver e siga o Tom de Voz Yooga."
+        improvements.append("Acolher o cliente antes de passar a solução técnica — reconheça o problema primeiro")
+        improvements.append("Usar linguagem mais próxima e humana (Jeito Yooga: informal, caloroso, sem gerundismo)")
+        improvements.append("Estudar o FAQ para guiar o cliente com os caminhos de menu corretos")
 
     return {
         "overall_score": overall_score,

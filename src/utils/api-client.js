@@ -1,4 +1,5 @@
-const BACKEND_URL = "http://localhost:8000";
+import { getBackendUrl } from "./backend-url.js";
+
 const BACKEND_API_KEY = import.meta.env.VITE_BACKEND_API_KEY || "";
 
 export async function apiRequest(endpoint, method = "GET", body = null) {
@@ -12,7 +13,7 @@ export async function apiRequest(endpoint, method = "GET", body = null) {
     options.body = JSON.stringify(body);
   }
   
-  const res = await fetch(`${BACKEND_URL}${endpoint}`, options);
+  const res = await fetch(`${getBackendUrl()}${endpoint}`, options);
   if (!res.ok) {
     throw new Error(`API returned status ${res.status}`);
   }
