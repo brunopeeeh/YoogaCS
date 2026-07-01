@@ -270,20 +270,20 @@ export default function ManageUsers() {
                     Carregando equipe Yooga...
                   </div>
                 ) : (
-                  <div className="grid gap-4">
+                  <div className="grid gap-5">
                     {users.map(user => {
                       const stats = userStats[user.email] || {};
                       return (
-                        <Card key={user.id} className="p-4 border-l-4 border-l-[#002D62] hover:shadow-md hover:scale-[1.005] active:scale-[0.995] transition-all duration-200 cursor-pointer">
-                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                <div className="w-10 h-10 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-full flex items-center justify-center text-white font-semibold">
+                        <Card key={user.id} className="p-5 md:p-6 border-l-4 border-l-[#002D62] hover:shadow-md transition-all duration-200">
+                          <div className="flex flex-col gap-5">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                              <div className="flex items-center gap-3 flex-wrap min-w-0 flex-1">
+                                <div className="w-11 h-11 bg-gradient-to-r from-[#002D62] to-[#004094] rounded-full flex items-center justify-center text-white font-semibold shrink-0">
                                   {(user.full_name || user.email)[0].toUpperCase()}
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-semibold text-slate-900 truncate">{user.full_name || 'Nome não informado'}</p>
-                                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                                  <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
                                     <Mail className="w-3.5 h-3.5 shrink-0" />
                                     <span className="truncate">{user.email}</span>
                                   </div>
@@ -296,57 +296,54 @@ export default function ManageUsers() {
                                   {user.role === 'admin' ? 'Líder / Admin' : 'CS Agente'}
                                 </Badge>
                               </div>
+
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleDeleteUser(user.id, user.email, user.full_name)}
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl self-end sm:self-center shrink-0"
+                                title="Excluir Usuário"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </Button>
                             </div>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center border-t md:border-t-0 pt-4 md:pt-0 w-full md:w-auto">
-                              <div>
-                                <div className="text-xl font-bold text-blue-600">
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t border-slate-100">
+                              <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-4 text-center min-h-[88px] flex flex-col justify-center gap-2">
+                                <div className="text-2xl sm:text-3xl font-bold text-blue-600 leading-none">
                                   {stats.totalSimulations || 0}
                                 </div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                                <div className="text-xs sm:text-sm text-slate-600 font-medium">
                                   Simulações
                                 </div>
                               </div>
-                              <div>
-                                <div className="text-xl font-bold text-green-600">
+                              <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-4 text-center min-h-[88px] flex flex-col justify-center gap-2">
+                                <div className="text-2xl sm:text-3xl font-bold text-green-600 leading-none">
                                   {stats.completedSimulations || 0}
                                 </div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                                <div className="text-xs sm:text-sm text-slate-600 font-medium">
                                   Concluídas
                                 </div>
                               </div>
-                              <div>
-                                <div className="text-xl font-bold text-[#FF6600]">
+                              <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-4 text-center min-h-[88px] flex flex-col justify-center gap-2">
+                                <div className="text-2xl sm:text-3xl font-bold text-[#FF6600] leading-none">
                                   {stats.averageScore || 0}%
                                 </div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                                  Score Médio
+                                <div className="text-xs sm:text-sm text-slate-600 font-medium">
+                                  Score médio
                                 </div>
                               </div>
-                              <div className="flex flex-col justify-center items-center">
-                                <div className="text-xs font-semibold text-slate-700">
+                              <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-4 text-center min-h-[88px] flex flex-col justify-center gap-2">
+                                <div className="text-sm sm:text-base font-bold text-slate-800 leading-snug">
                                   {stats.lastActivity 
                                     ? format(stats.lastActivity, 'dd/MM/yyyy', { locale: ptBR })
                                     : 'Nunca'
                                   }
                                 </div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
-                                  Atividade
+                                <div className="text-xs sm:text-sm text-slate-600 font-medium">
+                                  Última atividade
                                 </div>
                               </div>
-                            </div>
-
-                            {/* Botão de Deletar */}
-                            <div className="flex justify-end w-full md:w-auto border-t md:border-t-0 pt-2 md:pt-0">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => handleDeleteUser(user.id, user.email, user.full_name)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl"
-                                title="Excluir Usuário"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </Button>
                             </div>
                           </div>
                         </Card>
