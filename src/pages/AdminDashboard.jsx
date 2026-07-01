@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Simulation, User, Scenario, AgentPerformance } from "@/entities/all";
 import { useUser } from "../components/auth/UserProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, BarChart3, TrendingUp, Brain, Filter, Download, Database } from "lucide-react";
+import { Users, BarChart3, TrendingUp, Brain, Filter, Download, Database, Wrench } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Module, QuizAttempt, Certification, ensureKnowledgeReady } from "@/entities/Knowledge";
@@ -15,6 +15,7 @@ import UserPerformanceComparison from "../components/admin/UserPerformanceCompar
 import PerformanceTrends from "../components/admin/PerformanceTrends";
 import AdaptiveScenarios from "../components/admin/AdaptiveScenarios";
 import RagKnowledgeBase from "../components/admin/RagKnowledgeBase";
+import ImprovementsEditor from "../components/admin/ImprovementsEditor";
 
 
 export default function AdminDashboard() {
@@ -139,7 +140,7 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5 bg-white/80 border border-slate-200/50 rounded-2xl p-1 shadow-sm backdrop-blur-sm">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:grid-cols-6 bg-white/80 border border-slate-200/50 rounded-2xl p-1 shadow-sm backdrop-blur-sm">
             <TabsTrigger value="overview" className="gap-2 rounded-xl py-2.5">
               <BarChart3 className="w-4 h-4" />
               Visão Geral
@@ -159,6 +160,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="rag" className="gap-2 rounded-xl py-2.5">
               <Database className="w-4 h-4" />
               Base RAG
+            </TabsTrigger>
+            <TabsTrigger value="improvements" className="gap-2 rounded-xl py-2.5">
+              <Wrench className="w-4 h-4" />
+              Melhorias
             </TabsTrigger>
           </TabsList>
 
@@ -202,6 +207,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="rag" className="space-y-6 outline-none">
             <RagKnowledgeBase />
+          </TabsContent>
+
+          <TabsContent value="improvements" className="space-y-6 outline-none">
+            <ImprovementsEditor simulations={simulations} />
           </TabsContent>
         </Tabs>
       </div>

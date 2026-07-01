@@ -281,13 +281,15 @@ Gere sua próxima resposta curta como o cliente Yooga no chat.`;
     return instructions[profile] || "Seja natural e realista conforme seu perfil de cliente.";
   };
 
-  const sendMessage = async (messageText) => {
-    if (!messageText.trim() || !currentSimulation) return;
+  const sendMessage = async (messageText, imageUrl = null) => {
+    if (!messageText.trim() && !imageUrl) return;
+    if (!currentSimulation) return;
 
     // Adicionar imediatamente a mensagem do atendente ao chat para exibição instantânea
     const agentMessage = {
       sender: "agent",
       message: messageText.trim(),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
       timestamp: new Date().toISOString()
     };
 

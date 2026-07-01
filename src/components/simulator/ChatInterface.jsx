@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Send, Bot, User, StopCircle, Loader2, Lightbulb, PartyPopper } from "lucide-react";
+import { Send, Bot, User, StopCircle, Loader2, Lightbulb, PartyPopper, ImagePlus, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -22,8 +22,10 @@ export default function ChatInterface({
   onPrefillConsumed
 }) {
   const [currentMessage, setCurrentMessage] = useState("");
+  const [pendingImage, setPendingImage] = useState(null); // { dataUrl, name }
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,11 +45,33 @@ export default function ChatInterface({
     }
   }, [prefillMessage]);
 
+  const loadImageFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => setPendingImage({ dataUrl: reader.result, name: file.name });
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    loadImageFile(file);
+    e.target.value = "";
+  };
+
+  const handlePaste = (e) => {
+    const items = Array.from(e.clipboardData?.items ?? []);
+    const imageItem = items.find(i => i.type.startsWith("image/"));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (file) loadImageFile(file);
+  };
+
   const handleSendMessage = () => {
-    if (currentMessage.trim() && !isLoading) {
-      onSendMessage(currentMessage);
-      setCurrentMessage("");
-    }
+    if ((!currentMessage.trim() && !pendingImage) || isLoading) return;
+    onSendMessage(currentMessage, pendingImage?.dataUrl ?? null);
+    setCurrentMessage("");
+    setPendingImage(null);
   };
 
   const handleKeyDown = (e) => {
@@ -161,9 +185,19 @@ export default function ChatInterface({
                       {message.sender === 'agent' ? agentName : 'Cliente'}
                     </span>
                   </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.message}
-                  </p>
+                  {message.image_url && (
+                    <img
+                      src={message.image_url}
+                      alt="imagem enviada"
+                      className="rounded-lg max-w-[220px] mb-2 cursor-pointer"
+                      onClick={() => window.open(message.image_url, '_blank')}
+                    />
+                  )}
+                  {message.message && (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {message.message}
+                    </p>
+                  )}
                   <p className={`text-xs mt-2 opacity-60`}>
                     {format(new Date(message.timestamp), 'HH:mm', { locale: ptBR })}
                   </p>
@@ -191,6 +225,22 @@ export default function ChatInterface({
           
           {/* Message Input */}
           <div className="border-t p-4 bg-slate-50/50">
+            {/* Preview da imagem pendente */}
+            {pendingImage && (
+              <div className="relative inline-block mb-3">
+                <img
+                  src={pendingImage.dataUrl}
+                  alt={pendingImage.name}
+                  className="rounded-lg max-h-28 border border-slate-200 shadow-sm"
+                />
+                <button
+                  onClick={() => setPendingImage(null)}
+                  className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
             <div className="flex items-start gap-3">
               <div className="flex-1">
                 <Textarea
@@ -198,6 +248,7 @@ export default function ChatInterface({
                   value={currentMessage}
                   onChange={(e) => setCurrentMessage(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   placeholder="Digite sua resposta como agente de CS..."
                   className="flex-1 min-h-[60px] max-h-32 resize-none bg-white"
                   disabled={isLoading}
@@ -210,10 +261,28 @@ export default function ChatInterface({
               <div className="flex flex-col gap-2">
                 <Button
                   onClick={handleSendMessage}
-                  disabled={!currentMessage.trim() || isLoading}
+                  disabled={(!currentMessage.trim() && !pendingImage) || isLoading}
                   className="bg-[#002D62] hover:bg-[#004094] h-10 w-24 rounded-xl hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer shadow-sm"
                 >
                   <Send className="w-4 h-4 mr-2" /> Enviar
+                </Button>
+                {/* Botão de imagem */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  title="Enviar imagem ou print"
+                  className="h-10 w-24 rounded-xl hover:scale-[1.03] active:scale-[0.97] transition-all duration-200 cursor-pointer hover:bg-slate-100 border-slate-200"
+                >
+                  <ImagePlus className="w-4 h-4 mr-2" />
+                  Foto
                 </Button>
                 <Button
                   variant="outline"
