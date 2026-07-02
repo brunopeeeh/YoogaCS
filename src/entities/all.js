@@ -182,11 +182,8 @@ export const User = {
       sessionStorage.setItem('current_user', JSON.stringify(sessionUser));
       return sessionUser;
     } catch (err) {
-      if (err.message && err.message.includes("API returned status")) {
-        console.warn("[Yooga Auth] Backend indisponível, tentando login offline...");
-      } else {
-        throw err;
-      }
+      // Cai no fallback offline em qualquer erro de rede/backend (NetworkError, timeout, 4xx/5xx)
+      console.warn("[Yooga Auth] Backend indisponível, tentando login offline:", err.message);
     }
 
     // Fallback offline: login via localStorage
