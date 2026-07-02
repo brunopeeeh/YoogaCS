@@ -4,9 +4,26 @@ import { Scenario } from "@/entities/all";
 import { ensureKnowledgeReady } from "@/entities/Knowledge";
 import { useUser } from "../components/auth/UserProvider";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, BrainCircuit, X } from "lucide-react";
+import { Plus, Search, BrainCircuit, X, Monitor, Truck, Plug, FileText, LayoutGrid } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AnimatePresence } from "framer-motion";
+
+const TRAILS = [
+  { id: "all",          label: "Todos",        icon: LayoutGrid },
+  { id: "PDV",          label: "PDV",           icon: Monitor    },
+  { id: "Delivery",     label: "Delivery",      icon: Truck      },
+  { id: "Integrações",  label: "Integrações",   icon: Plug       },
+  { id: "Fiscal",       label: "Fiscal",        icon: FileText   },
+];
+
+function getTrail(scenario) {
+  const title = scenario?.title || "";
+  if (/^PDV:|Venda Offline|^Caixa:/i.test(title))                        return "PDV";
+  if (/^Delivery:/i.test(title))                                          return "Delivery";
+  if (/^Fiscal:|NFC-e|Inventário Fiscal/i.test(title))                   return "Fiscal";
+  if (/Integra[çc]|iFood|KDS|WhatsApp|PIX Online|Rob[ôo]/i.test(title)) return "Integrações";
+  return "Outros";
+}
 
 import ScenarioCard from "../components/scenarios/ScenarioCard";
 import ScenarioForm from "../components/scenarios/ScenarioForm";
@@ -26,6 +43,7 @@ export default function Scenarios() {
     client_profile: "all",
     status: "all"
   });
+  const [activeTrail, setActiveTrail] = useState("all");
   const userRole = user?.role || 'user'; // Derived from the central user context
 
   const hasLoadedRef = React.useRef(false);
@@ -90,6 +108,7 @@ export default function Scenarios() {
 
   const handleResetFilters = () => {
     setSearchTerm("");
+    setActiveTrail("all");
     setFilters({
       difficulty: "all",
       client_profile: "all",
@@ -114,8 +133,9 @@ export default function Scenarios() {
       (filters.difficulty === "avançado" && scenario.difficulty_level === "avancado");
     const matchesClientProfile = filters.client_profile === "all" || scenario.client_profile === filters.client_profile;
     const matchesStatus = filters.status === "all" || scenario.status === filters.status;
-    
-    return matchesSearch && matchesDifficulty && matchesClientProfile && matchesStatus;
+    const matchesTrail = activeTrail === "all" || getTrail(scenario) === activeTrail;
+
+    return matchesSearch && matchesDifficulty && matchesClientProfile && matchesStatus && matchesTrail;
   });
 
   // console.log("UserRole in Scenarios:", userRole); // Debug log
@@ -156,7 +176,33 @@ export default function Scenarios() {
           )}
         </div>
 
-        {/* Search and Filters */}
+        {/* Trail filter — horizontal pill bar */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {TRAILS.map(({ id, label, icon: Icon }) => {
+            const isActive = activeTrail === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTrail(id)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border transition-all duration-200 cursor-pointer select-none
+                  ${isActive
+                    ? "bg-primary text-white border-primary shadow-md scale-[1.03]"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-primary/50 hover:text-primary hover:shadow-sm"
+                  }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+                {id !== "all" && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+                    {scenarios.filter(s => getTrail(s) === id).length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search and secondary Filters */}
         <div className="mb-8 space-y-4">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
