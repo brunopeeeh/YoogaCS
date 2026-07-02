@@ -18,7 +18,9 @@ export async function apiRequest(endpoint, method = "GET", body = null) {
   }
   
   const res = await fetch(`${getBackendUrl()}${endpoint}`, options);
+  clearTimeout(timeoutId);
   if (!res.ok) {
     throw new Error(`API returned status ${res.status}`);
   }
+  return res.json();
 }
