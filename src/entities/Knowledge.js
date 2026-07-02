@@ -264,84 +264,280 @@ Passo a passo para ativar:
       
     }
     
-    // Sempre garantir que novos cenários com base no FAQ estendido existam (para testes imediatos do RAG)
+    // Cenários baseados na wiki — variados por trilha, dificuldade e perfil de cliente
     try {
-      const currentModules = await Module.list();
-      const m1 = currentModules.find(m => m.name.includes("PDV")) || { id: "local-m1" };
-      const m2 = currentModules.find(m => m.name.includes("Delivery")) || { id: "local-m2" };
+      // Remover cenários legados que foram substituídos por versões melhores
+      const LEGACY_TITLES = [
+        "Impressora: Layout Cortado na Bobina",
+        "Caixa: Dividir Pagamento no PDV",
+        "Segurança: Senha para Cancelamentos",
+        "Delivery: Ativar o Chat de Pedidos",
+      ];
+      try {
+        const allScenarios = await Scenario.list();
+        for (const s of allScenarios) {
+          if (LEGACY_TITLES.some(t => t.toLowerCase() === s.title?.trim().toLowerCase())) {
+            await Scenario.delete(s.id);
+          }
+        }
+      } catch (_) { /* silencia se delete não existir */ }
 
-      // 1. Impressora: Layout Cortado na Bobina
+      const currentModules = await Module.list();
+      const mPDV      = currentModules.find(m => m.name.includes("PDV"))      || { id: "local-m1" };
+      const mDelivery = currentModules.find(m => m.name.includes("Delivery")) || { id: "local-m2" };
+      const mFiscal   = currentModules.find(m => m.name.includes("Fiscal"))   || { id: "local-m3" };
+
+      // ─── TRILHA PDV ───────────────────────────────────────────────────────────
+
+      // PDV · Iniciante · Tranquilo
       await getOrCreateScenario({
-        title: "Impressora: Layout Cortado na Bobina",
-        description: "O cliente está nervoso porque a impressão térmica sai cortada nas laterais na nova impressora de 58mm.",
-        initial_problem: "Gente, me ajuda! Instalei a impressora térmica nova Bematech no caixa de 58mm, mas quando imprimo o pedido o texto sai todo cortado na lateral! Os motoboys não conseguem ler o endereço e está uma confusão. O que eu faço?",
+        title: "PDV: Abrir o Caixa pela Primeira Vez",
+        description: "Um novo operador de caixa não sabe como abrir o caixa e lançar o fundo inicial antes de começar a atender.",
+        initial_problem: "Oi! Sou novo aqui e é minha primeira vez usando o sistema. Meu gerente me pediu pra abrir o caixa com R$ 200 de fundo de troco antes de começar. Como faço isso?",
+        client_profile: "tranquilo",
+        difficulty_level: "iniciante",
+        expected_interactions: 4,
+        goals: [
+          "Recepcionar o novo operador com empatia e encorajamento.",
+          "Orientar a acessar 'Histórico de Vendas' e clicar em 'Quero abrir meu caixa'.",
+          "Explicar como inserir o valor R$ 200 no campo 'Saldo real' e confirmar clicando em 'Abrir Caixa'.",
+          "Avisar que o caixa agora está aberto e pronto para registrar vendas."
+        ],
+        status: "ativo",
+        moduleId: mPDV.id
+      });
+
+      // PDV · Intermediário · Irritado
+      await getOrCreateScenario({
+        title: "PDV: Operador sem Permissão para Desconto",
+        description: "Um operador irritado não consegue aplicar desconto no PDV e pressiona o suporte para liberar acesso.",
+        initial_problem: "Que absurdo! Tentei dar um desconto pro cliente que estava esperando há meia hora e o sistema nem deixa! Aparece que não tenho permissão. Meu chefe não está aqui, o que eu faço agora?",
         client_profile: "irritado",
         difficulty_level: "intermediario",
-        expected_interactions: 4,
+        expected_interactions: 5,
         goals: [
-          "Acalmar o cliente com empatia sobre a confusão com os motoboys.",
-          "Explicar como acessar a configuração de Impressoras no painel Yooga.",
-          "Instruir a alterar a largura da bobina para 58mm no layout ou ajustar as margens verticais e horizontais.",
-          "Clicar em Salvar e fazer uma impressão de teste para validar."
+          "Acalmar o operador mostrando empatia com a situação constrangedora.",
+          "Explicar que permissões são configuradas por um Administrador em Ajustes > Usuários > Permissões.",
+          "Orientar a localizar a permissão 'Aplicar desconto' dentro do módulo correto (Mesas ou Balcão).",
+          "Sugerir contato imediato com o gerente para liberar a permissão ou usar a senha de supervisor no PDV.",
+          "Confirmar que após ajuste o operador conseguirá aplicar descontos normalmente."
         ],
         status: "ativo",
-        moduleId: m1.id
+        moduleId: mPDV.id
       });
 
-      // 2. Caixa: Dividir Pagamento no PDV
+      // PDV · Avançado · Tranquilo
       await getOrCreateScenario({
-        title: "Caixa: Dividir Pagamento no PDV",
-        description: "O atendente está confuso sobre como registrar múltiplas formas de pagamento na mesma venda.",
-        initial_problem: "Olá, equipe. Estou com uma mesa de clientes aqui no balcão que quer rachar a conta. Eles querem pagar R$ 50,00 em dinheiro e os outros R$ 30,00 no Pix. Como que eu lanço essas duas formas de pagamento juntas na mesma venda pra fechar o caixa certinho?",
-        client_profile: "confuso",
+        title: "PDV: Configurar Cardápio QR Code para Mesas",
+        description: "Gerente quer substituir cardápios físicos pelo QR code digital para agilizar o atendimento nas mesas.",
+        initial_problem: "Olá! Quero implementar o cardápio digital com QR code aqui no salão para acabar com o custo de reimprimir cardápios toda vez que mudo o preço. Como configuro isso na Yooga?",
+        client_profile: "tranquilo",
+        difficulty_level: "avancado",
+        expected_interactions: 6,
+        goals: [
+          "Explicar o funcionamento: o QR code reflete o cardápio online em tempo real.",
+          "Orientar o caminho: Ajustes > Geral > ativar 'Habilitar cardápio digital'.",
+          "Após ativar, explicar que a opção 'Cardápio QR code' aparece no topo de Ajustes.",
+          "Instruir a clicar em 'Configurar QR code' e escolher entre imprimir só o QR ou o folheto personalizado.",
+          "Esclarecer que qualquer alteração de preço ou item no cardápio é refletida automaticamente no QR code.",
+          "Confirmar que não há custo adicional pela funcionalidade de cardápio digital."
+        ],
+        status: "ativo",
+        moduleId: mPDV.id
+      });
+
+      // PDV · Intermediário · Tranquilo
+      await getOrCreateScenario({
+        title: "PDV: Cadastrar Produto com Preço por Peso",
+        description: "Dono de açougue quer cadastrar produtos pesáveis integrados à balança no PDV.",
+        initial_problem: "Tenho um açougue e vendo carne por quilo. Como cadastro os produtos para que o preço seja calculado automaticamente pelo peso que a balança marcar na hora da venda?",
+        client_profile: "tranquilo",
+        difficulty_level: "intermediario",
+        expected_interactions: 5,
+        goals: [
+          "Confirmar que a Yooga suporta produtos pesáveis integrados à balança.",
+          "Orientar a acessar o cadastro do produto e ativar a opção 'Função pesável'.",
+          "Explicar que ao habilitar, o PDV vai aguardar a leitura do peso da balança para calcular o valor.",
+          "Mencionar a necessidade de a balança estar corretamente configurada e pareada com o sistema.",
+          "Sugerir fazer um teste de pesagem após o cadastro para confirmar a integração."
+        ],
+        status: "ativo",
+        moduleId: mPDV.id
+      });
+
+      // ─── TRILHA DELIVERY ──────────────────────────────────────────────────────
+
+      // Delivery · Iniciante · Irritado
+      await getOrCreateScenario({
+        title: "Delivery: Loja Não Abre no Horário Configurado",
+        description: "Cliente irritado porque o delivery não abre automaticamente no horário combinado, prejudicando os primeiros pedidos do dia.",
+        initial_problem: "Meu delivery deveria abrir às 11h mas já são 11h30 e continua fechado! Estou perdendo pedidos! Configurei o horário semana passada, o que está errado?",
+        client_profile: "irritado",
         difficulty_level: "iniciante",
         expected_interactions: 4,
         goals: [
-          "Mostrar o passo a passo de clicar em 'Pagar' no fechamento do pedido no PDV.",
-          "Orientar a digitar primeiro o valor parcial (R$ 50,00) no campo de pagamento.",
-          "Instruir a selecionar 'Dinheiro' e clicar em 'Adicionar Pagamento' para registrar a primeira parte.",
-          "Mostrar como escolher a segunda forma de pagamento (Pix) para o saldo devedor restante (R$ 30,00) e concluir a venda."
+          "Reconhecer a urgência e demonstrar empatia com o prejuízo de pedidos perdidos.",
+          "Orientar a verificar se o horário está salvo em Ajustes > Configurações > Horário de Funcionamento.",
+          "Confirmar que o dia da semana correto está selecionado no horário cadastrado.",
+          "Explicar que o delivery abre e fecha automaticamente conforme o horário, sem necessidade de ação manual."
         ],
         status: "ativo",
-        moduleId: m1.id
+        moduleId: mDelivery.id
       });
 
-      // 3. Segurança: Senha para Cancelamentos
+      // Delivery · Intermediário · Tranquilo
       await getOrCreateScenario({
-        title: "Segurança: Senha para Cancelamentos",
-        description: "O gerente de um restaurante quer bloquear operadores de caixa comuns de cancelarem pedidos sem permissão.",
-        initial_problem: "Olá! Estou desconfiado de que alguns operadores de caixa estão cancelando pedidos depois que os clientes pagam em dinheiro para desviar o caixa. Como eu faço para colocar uma senha ou bloquear o cancelamento no caixa comum?",
-        client_profile: "detalhista",
+        title: "Delivery: Ativar Adição Múltipla de Produtos",
+        description: "Dono de distribuidora quer que clientes possam adicionar vários itens (ex: refrigerantes) ao carrinho com um único clique.",
+        initial_problem: "Tenho uma distribuidora e os clientes compram refrigerante às caixas. Tem como deixar o carrinho do delivery com botão de quantidade direto na listagem de produtos sem precisar entrar em cada um?",
+        client_profile: "tranquilo",
         difficulty_level: "intermediario",
         expected_interactions: 4,
         goals: [
-          "Explicar como acessar o Painel Administrativo > Configurações > Permissões de Usuários.",
-          "Orientar a selecionar o cargo de 'Operador de Caixa' e desmarcar a opção 'Permitir Cancelamento de Vendas'.",
-          "Explicar que a partir do bloqueio, o PDV exigirá a digitação da senha de um Administrador ou Gerente para concluir qualquer cancelamento.",
-          "Indicar que os cancelamentos ficam auditados no relatório de justificativas financeiras."
+          "Confirmar que a funcionalidade 'Adição Múltipla' existe nativamente no delivery Yooga.",
+          "Orientar o caminho: Cardápio de Delivery > selecionar a categoria > Editar Categoria.",
+          "Instruir a ativar a opção 'Seleção de múltiplas unidades' e salvar.",
+          "Explicar que o cliente verá um contador (+/-) diretamente na listagem dos produtos da categoria."
         ],
         status: "ativo",
-        moduleId: m1.id
+        moduleId: mDelivery.id
       });
 
-      // 4. Delivery: Ativar o Chat de Pedidos
+      // Delivery · Avançado · Irritado
       await getOrCreateScenario({
-        title: "Delivery: Ativar o Chat de Pedidos",
-        description: "O cliente deseja centralizar a comunicação com seus compradores diretamente no link de pedidos do delivery, dispensando o uso de WhatsApp.",
-        initial_problem: "Olá! Vi que os clientes vivem me chamando no WhatsApp pra perguntar se o pedido já saiu pra entrega ou pra pedir pra tirar a cebola de última hora. Tem como os clientes conversarem comigo direto pelo link de pedidos do Delivery da Yooga, sem ter que ficar mandando mensagem no meu WhatsApp comercial?",
-        client_profile: "confuso",
-        difficulty_level: "iniciante",
-        expected_interactions: 4,
+        title: "Delivery: Produto Disponível Só em Dias Específicos",
+        description: "Cliente frustrado pois clientes estão pedindo marmita de sábado na segunda e o produto não deveria aparecer no delivery nesse dia.",
+        initial_problem: "Estou com um problema sério! Tenho um prato especial de sábado, mas os clientes estão pedindo segunda-feira e depois reclamam que não tem. Preciso que esse produto SÓ apareça no sábado. Como configuro isso?",
+        client_profile: "irritado",
+        difficulty_level: "avancado",
+        expected_interactions: 5,
         goals: [
-          "Confirmar que a Yooga possui a funcionalidade nativa de Chat no Delivery",
-          "Orientar o caminho exato de ativação: Ajustes > Configurações > Habilitar chat",
-          "Explicar que para o estabelecimento a opção 'Chat com o cliente' aparece ao clicar sobre o pedido no painel de delivery",
-          "Explicar que para o cliente o botão 'Chat com a loja' fica disponível na tela/link de acompanhamento do pedido",
-          "Mencionar que essa função é ideal para evitar o desvio para o WhatsApp e centralizar o suporte do restaurante"
+          "Validar a dor do cliente: reclamações de pedidos não atendidos prejudicam a reputação.",
+          "Explicar que existe a funcionalidade 'Disponibilidade por dia' para produtos no delivery.",
+          "Orientar: Cardápio de Delivery > selecionar o produto > editar > aba Disponibilidade.",
+          "Instruir a selecionar apenas 'Sábado' nos dias de disponibilidade e salvar.",
+          "Confirmar que o produto ficará oculto automaticamente nos outros dias da semana."
         ],
         status: "ativo",
-        moduleId: m2.id
+        moduleId: mDelivery.id
       });
+
+      // Delivery · Iniciante · Tranquilo
+      await getOrCreateScenario({
+        title: "Delivery: Destacar Produto no Cardápio Digital",
+        description: "Dono de restaurante quer deixar o prato do dia em destaque no topo do cardápio online para aumentar as vendas.",
+        initial_problem: "Oi! Quero deixar a minha 'Marmita Executiva' em destaque no cardápio do delivery hoje. Tem como botar ela lá em cima chamando atenção dos clientes?",
+        client_profile: "tranquilo",
+        difficulty_level: "iniciante",
+        expected_interactions: 3,
+        goals: [
+          "Confirmar que a Yooga tem função de destaque nativa no cardápio de delivery.",
+          "Orientar: Cardápio de Delivery > selecionar o produto > ativar opção 'Destacar produto'.",
+          "Explicar que o produto aparecerá em uma seção especial no topo do cardápio para os clientes."
+        ],
+        status: "ativo",
+        moduleId: mDelivery.id
+      });
+
+      // ─── TRILHA INTEGRAÇÕES ───────────────────────────────────────────────────
+
+      // Integrações · Iniciante · Tranquilo
+      await getOrCreateScenario({
+        title: "Integrações: Ativar o KDS (Monitor de Cozinha)",
+        description: "Gerente quer eliminar impressões na cozinha e usar uma tela para monitorar pedidos em tempo real.",
+        initial_problem: "Quero instalar um monitor na cozinha para os cozinheiros acompanharem os pedidos sem depender de impressora. Vi falar no KDS da Yooga. Como funciona e o que preciso fazer para ativar?",
+        client_profile: "tranquilo",
+        difficulty_level: "iniciante",
+        expected_interactions: 5,
+        goals: [
+          "Explicar o KDS: tela que exibe pedidos em tempo real, com status em andamento, pronto e cancelado.",
+          "Informar que o valor é R$ 160/mês e que a contratação é feita pelo suporte ou chat no app.",
+          "Orientar que após contratar, o acesso é configurado em Ajustes > Integrações > KDS.",
+          "Explicar que é possível definir quais setores (cozinha, bar) recebem quais itens no monitor.",
+          "Mencionar que o KDS pode substituir ou complementar as impressoras de produção."
+        ],
+        status: "ativo",
+        moduleId: mPDV.id
+      });
+
+      // Integrações · Intermediário · Irritado
+      await getOrCreateScenario({
+        title: "Integrações: Robô do WhatsApp não Responde Clientes",
+        description: "Dono irritado porque o robô de respostas automáticas do WhatsApp parou de funcionar após uma atualização.",
+        initial_problem: "Meu robô do WhatsApp que responde automaticamente os clientes parou de funcionar! Os clientes mandam mensagem perguntando o cardápio e ninguém responde. Isso está matando minhas vendas!",
+        client_profile: "irritado",
+        difficulty_level: "intermediario",
+        expected_interactions: 5,
+        goals: [
+          "Demonstrar empatia com o impacto direto nas vendas e acalmar o cliente.",
+          "Verificar junto ao cliente se a integração está ativa em Ajustes > Integrações > Robô WhatsApp.",
+          "Solicitar que verifique se o número de WhatsApp Business ainda está vinculado corretamente.",
+          "Orientar a desconectar e reconectar o QR code de vinculação caso o status apareça como desconectado.",
+          "Caso persista, escalar para o suporte técnico com print do status da integração."
+        ],
+        status: "ativo",
+        moduleId: mDelivery.id
+      });
+
+      // Integrações · Avançado · Tranquilo
+      await getOrCreateScenario({
+        title: "Integrações: Configurar PIX Online no Delivery",
+        description: "Proprietário quer ativar o pagamento via PIX direto no link de pedidos do delivery para receber online com segurança.",
+        initial_problem: "Quero aceitar PIX no meu delivery diretamente pelo link de pedido, sem o cliente ter que pagar na entrega. Tem como o dinheiro cair direto na minha conta? Como configuro isso?",
+        client_profile: "tranquilo",
+        difficulty_level: "avancado",
+        expected_interactions: 6,
+        goals: [
+          "Confirmar que a Yooga oferece integração de PIX online para o delivery.",
+          "Explicar que o recurso é o 'Pix Online' disponível em Ajustes > Integrações > Pix Online.",
+          "Orientar o cadastro da chave Pix e vinculação com a conta bancária desejada.",
+          "Explicar que após ativação o cliente verá 'Pagar com Pix' na finalização do pedido.",
+          "Esclarecer que o valor cai diretamente na conta cadastrada, sem intermediários.",
+          "Mencionar que pedidos com Pix pago online ficam marcados como 'Pagamento confirmado' no painel."
+        ],
+        status: "ativo",
+        moduleId: mDelivery.id
+      });
+
+      // ─── TRILHA FISCAL ────────────────────────────────────────────────────────
+
+      // Fiscal · Intermediário · Confuso
+      await getOrCreateScenario({
+        title: "Fiscal: Acompanhar Notas Emitidas no Painel",
+        description: "Contador do restaurante quer entender como filtrar e exportar as NFC-e emitidas em um período para conciliação.",
+        initial_problem: "Preciso ver todas as notas fiscais emitidas no mês de dezembro para passar pro contador. Tem como filtrar por período e ver o status de cada nota? Onde fica isso no sistema?",
+        client_profile: "tranquilo",
+        difficulty_level: "intermediario",
+        expected_interactions: 4,
+        goals: [
+          "Orientar o acesso pelo painel: painel.yooga.com.br > Fiscal > Vendas.",
+          "Explicar como usar o filtro de período para selecionar dezembro.",
+          "Mostrar que é possível filtrar também por modelo da nota (NFC-e, NF-e) e status (transmitida, cancelada).",
+          "Confirmar que o resultado pode ser exportado ou compartilhado com o contador."
+        ],
+        status: "ativo",
+        moduleId: mFiscal.id
+      });
+
+      // Fiscal · Avançado · Irritado
+      await getOrCreateScenario({
+        title: "Fiscal: Inventário Fiscal Obrigatório Pendente",
+        description: "Empresário irritado recebeu alerta do contador que o inventário fiscal anual está vencido e precisa ser gerado urgente.",
+        initial_problem: "Meu contador acabou de me ligar furioso dizendo que o inventário fiscal do ano está vencido e que posso ser multado! Ele disse que precisa de um arquivo gerado pelo sistema. Como eu gero isso na Yooga urgente?",
+        client_profile: "irritado",
+        difficulty_level: "avancado",
+        expected_interactions: 5,
+        goals: [
+          "Reconhecer a urgência e tranquilizar o cliente sem minimizar o problema.",
+          "Orientar o acesso: painel.yooga.com.br > Fiscal > Inventário Fiscal.",
+          "Explicar como selecionar o período de referência e gerar o arquivo de inventário.",
+          "Alertar que os produtos precisam ter NCM (código fiscal) cadastrado para o inventário ser completo.",
+          "Sugerir encaminhar o arquivo gerado imediatamente ao contador após a exportação."
+        ],
+        status: "ativo",
+        moduleId: mFiscal.id
+      });
+
     } catch (scErr) {
       console.error("Erro ao popular cenários de FAQ estendido:", scErr);
     }
