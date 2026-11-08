@@ -367,6 +367,50 @@ Também **rotacione a service role key** no dashboard do Supabase
 (*Project Settings → API Keys*) e atualize a variável `SUPABASE_SERVICE_ROLE_KEY`
 no Render.
 
+### Segredo que esteve no histórico do repositório
+
+O arquivo `.mcp.json` (que continha um token de acesso do Supabase no formato
+`sbp_…`) foi removido do tracking, o histórico local foi reescrito com
+`git filter-branch` e as branches `main` e
+`cursor/setup-dev-environment-708e` foram regravadas no GitHub. Uma varredura
+em **todos os objetos** do repositório local e de um clone espelho do GitHub
+não encontra mais nenhuma ocorrência do segredo.
+
+Dois pontos importantes para dimensionar o risco:
+
+* **A service role key real nunca esteve no repositório.** O valor exposto era
+  um token `sbp_…` que, testado contra a Platform API, o PostgREST e o MCP,
+  responde `401` em **todos** os endpoints — ou seja, hoje ele não concede
+  acesso nenhum. Ainda assim, ele deve ser considerado comprometido e
+  revogado no dashboard.
+* **A anon key é pública por natureza** (é embutida em qualquer app web) e por
+  isso **não** é um segredo. A proteção real vem das policies e do backend:
+  com o RLS fechado, a anon key não consegue ler nem escrever nas tabelas
+  relacionais.
+
+### Risco residual: `refs/pull/1/head`
+
+O GitHub mantém, para PRs **fechados**, uma ref oculta `refs/pull/<n>/head`
+que continua servindo o commit original do PR. Como o PR #1 foi aberto antes
+da limpeza, essa ref ainda aponta para o commit antigo e ainda entrega o
+`.mcp.json` com o token revogado:
+
+```bash
+# ainda acessível anonimamente (o token está revogado, mas o arquivo é exposto)
+git fetch https://github.com/brunopeeeh/YoogaCS.git refs/pull/1/head
+```
+
+Não é possível apagar essa ref pelo cliente: `refs/pull/*` é somente leitura
+pela API (`422 refs/pull/* is read-only`) e o PR não pode ser reaberto porque
+o GitHub congela `base.sha`/`head.sha` de PRs fechados (os dois lados ficaram
+em históricos disjuntos após a reescrita).
+
+**Ação necessária:** abrir um chamado no
+[Suporte do GitHub](https://support.github.com/contact)
+solicitando a remoção da ref `refs/pull/1/head` do repositório
+`brunopeeeh/YoogaCS` (motivo: remoção de segredo exposto). Descreva que o
+segredo já foi revogado e que o histórico público foi reescrito.
+
 ### Histórico de migrations
 
 O banco remoto foi montado manualmente e **não possuía histórico de migrations**
