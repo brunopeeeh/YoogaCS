@@ -1,11 +1,16 @@
 /**
  * Entidades centralizadas com fallback local — substituem o localStorage puro.
  * Tenta persistir no Supabase via API Python e degrada suavemente para o localStorage local se offline.
+ *
+ * IMPORTANTE: erros de autorização (401/403) e de misconfiguração (503) nunca
+ * caem no fallback local — degradar nesses casos esconderia a falta de permissão
+ * e allow-listaria o usuário a "funcionar" sem estar autenticado.
  */
 
 import { generateId, now, createLocalEntity } from "./base.js";
-import { apiRequest } from "@/utils/api-client";
+import { apiRequest, isFatalError } from "@/utils/api-client";
 import { addToQueue } from "@/utils/sync-queue";
+import { clearAuthSession, getAuthToken, getStoredUser, setAuthSession } from "@/utils/auth-token";
 
 export { apiRequest };
 
@@ -17,6 +22,7 @@ function createEntity(storageKey) {
       try {
         return await apiRequest(`/api/db/${storageKey}?orderBy=${orderBy}`);
       } catch (err) {
+        if (isFatalError(err)) throw err;
         console.warn(`[Supabase Migration] API list falhou para ${storageKey}, usando fallback local:`, err.message);
         return localEntity.list(orderBy);
       }
@@ -26,6 +32,7 @@ function createEntity(storageKey) {
       try {
         return await apiRequest(`/api/db/${storageKey}/filter`, "POST", { criteria, orderBy, limit });
       } catch (err) {
+        if (isFatalError(err)) throw err;
         console.warn(`[Supabase Migration] API filter falhou para ${storageKey}, usando fallback local:`, err.message);
         return localEntity.filter(criteria, orderBy, limit);
       }
@@ -52,6 +59,7 @@ function createEntity(storageKey) {
       try {
         return await apiRequest(`/api/db/${storageKey}`, "POST", payload);
       } catch (err) {
+        if (isFatalError(err)) throw err;
         console.warn(`[Supabase Migration] API create falhou para ${storageKey}, usando fallback local e enfileirando:`, err.message);
         const localItem = localEntity.create(payload);
         if (!skipSyncQueue) {
@@ -65,6 +73,7 @@ function createEntity(storageKey) {
       try {
         return await apiRequest(`/api/db/${storageKey}/${id}`, "PUT", data);
       } catch (err) {
+        if (isFatalError(err)) throw err;
         console.warn(`[Supabase Migration] API update falhou para ${storageKey}/${id}, usando fallback local e enfileirando:`, err.message);
         let localItem;
         try {
@@ -82,6 +91,7 @@ function createEntity(storageKey) {
       try {
         return await apiRequest(`/api/db/${storageKey}/${id}`, "DELETE");
       } catch (err) {
+        if (isFatalError(err)) throw err;
         console.warn(`[Supabase Migration] API delete falhou para ${storageKey}/${id}, usando fallback local e enfileirando:`, err.message);
         const localItem = localEntity.delete(id);
         addToQueue(storageKey, "delete", id, null);
@@ -90,154 +100,83 @@ function createEntity(storageKey) {
     }
   };
 }
-// Função para gerar hash SHA-256 de uma senha (Web Crypto API)
-async function hashPassword(password) {
-  if (!password) return "";
-  const msgBuffer = new TextEncoder().encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 // Entidade User com suporte a perfil local e autenticação de verdade
 const _userEntity = createEntity('db_users');
 
-// Inicializar usuários de teste caso não existam
-(async () => {
-  try {
-    let existing = await _userEntity.list();
-
-    // Garantir criação do admin principal
-    const hasAdmin = existing.some(u => u.email.toLowerCase() === "admin@yooga.com.br");
-    if (!hasAdmin) {
-      const hashedPassword = await hashPassword("admin123");
-      await _userEntity.create({
-        full_name: "Administrador Yooga",
-        email: "admin@yooga.com.br",
-        role: "admin",
-        password: hashedPassword
-      });
-    }
-
-    // Garantir criação dos agentes de teste
-    const hasMariana = existing.some(u => u.email.toLowerCase() === "mariana.silva@yooga.com.br");
-    if (!hasMariana) {
-      const hashedPassword = await hashPassword("user123");
-      await _userEntity.create({
-        full_name: "Mariana Silva",
-        email: "mariana.silva@yooga.com.br",
-        role: "agent",
-        password: hashedPassword
-      });
-    }
-
-    const hasPedro = existing.some(u => u.email.toLowerCase() === "pedro.oliveira@yooga.com.br");
-    if (!hasPedro) {
-      const hashedPassword = await hashPassword("user123");
-      await _userEntity.create({
-        full_name: "Pedro Oliveira",
-        email: "pedro.oliveira@yooga.com.br",
-        role: "agent",
-        password: hashedPassword
-      });
-    }
-
-    // Garantir criação do usuário do Bruno
-    const hasBruno = existing.some(u => u.email.toLowerCase() === "bruno.oliveira@yooga.com.br");
-    if (!hasBruno) {
-      const hashedPassword = await hashPassword("123456");
-      await _userEntity.create({
-        full_name: "Bruno Oliveira",
-        email: "bruno.oliveira@yooga.com.br",
-        role: "admin",
-        password: hashedPassword
-      });
-    }
-  } catch (err) {
-    console.error("Erro ao inicializar usuários locais:", err);
-  }
-})();
-
 export const User = {
   ..._userEntity,
-  
+
   async me() {
+    // Sem token não há sessão: força a tela de login.
+    if (!getAuthToken()) {
+      clearAuthSession();
+      return null;
+    }
+
+    const stored = getStoredUser();
+    if (!stored) {
+      clearAuthSession();
+      return null;
+    }
+
     try {
-      const stored = sessionStorage.getItem('current_user');
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return null; // Forçar tela de login se não houver sessão ativa
+      // Revalida a sessão no backend (papel atual + token ainda válido).
+      const fresh = await apiRequest("/api/auth/me", "GET");
+      const sessionUser = {
+        id: fresh.id,
+        full_name: fresh.full_name,
+        email: fresh.email,
+        role: fresh.role,
+      };
+      setAuthSession(sessionUser, getAuthToken());
+      return sessionUser;
+    } catch (err) {
+      if (err?.status === 401 || err?.status === 403) {
+        clearAuthSession();
+        return null;
+      }
+      // Backend indisponível: mantém a sessão local para o app funcionar offline.
+      console.warn("[Yooga Auth] Backend indisponível ao validar sessão, mantendo sessão local:", err.message);
+      return stored;
+    }
   },
 
   async login(email, password) {
-    // Tenta autenticação pelo backend primeiro
-    try {
-      const result = await apiRequest("/api/auth/login", "POST", { email, password });
-      const sessionUser = {
-        id: result.id,
-        full_name: result.full_name,
-        email: result.email,
-        role: result.role
-      };
-      sessionStorage.setItem('current_user', JSON.stringify(sessionUser));
-      return sessionUser;
-    } catch (err) {
-      // Cai no fallback offline em qualquer erro de rede/backend (NetworkError, timeout, 4xx/5xx)
-      console.warn("[Yooga Auth] Backend indisponível, tentando login offline:", err.message);
-    }
-
-    // Fallback offline: login via localStorage
-    const users = await _userEntity.list();
-    const hashedInput = await hashPassword(password);
-    
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!found) {
-      throw new Error("E-mail ou senha incorretos.");
-    }
-
-    let isMatch = found.password === hashedInput;
-
-    if (!isMatch && found.password === password) {
-      isMatch = true;
-      try {
-        await _userEntity.update(found.id, { password: hashedInput });
-        console.log(`[Yooga Auth] Senha do usuário ${email} auto-migrada para hash SHA-256 com sucesso.`);
-      } catch (err) {
-        console.warn(`[Yooga Auth] Falha ao auto-migrar senha para hash para ${email}:`, err);
-      }
-    }
-
-    if (!isMatch) {
-      throw new Error("E-mail ou senha incorretos.");
-    }
-
+    // Autenticação exclusivamente no backend (bcrypt + JWT). Não existe fallback
+    // local: contas com senha padrão ou hash fraco não podem autenticar.
+    const result = await apiRequest("/api/auth/login", "POST", { email, password });
     const sessionUser = {
-      id: found.id,
-      full_name: found.full_name,
-      email: found.email,
-      role: found.role
+      id: result.id,
+      full_name: result.full_name,
+      email: result.email,
+      role: result.role
     };
-    sessionStorage.setItem('current_user', JSON.stringify(sessionUser));
+    setAuthSession(sessionUser, result.token);
     return sessionUser;
   },
 
-  async register(email, fullName, role = 'agent', password = 'user123') {
+  async register(email, fullName, role = 'agent', password) {
+    if (!password) {
+      throw new Error("Informe uma senha para o novo usuário.");
+    }
+
     const users = await _userEntity.list();
     const exists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
     if (exists) {
       throw new Error("E-mail já cadastrado.");
     }
-    const hashedPassword = await hashPassword(password);
+
+    // A senha chega em texto puro ao backend, que a grava com bcrypt.
     return await _userEntity.create({
       full_name: fullName,
       email: email.toLowerCase(),
       role,
-      password: hashedPassword
+      password
     });
   },
 
   async logout() {
-    sessionStorage.removeItem('current_user');
+    clearAuthSession();
   }
 };
 

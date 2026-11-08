@@ -12,10 +12,44 @@ from pydantic import BaseModel, Field
 import google.generativeai as genai
 from dotenv import load_dotenv
 from openai import OpenAI
-import hashlib
 
 # Carregar variáveis de ambiente do diretório pai
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+# Módulo de autenticação (bcrypt + JWT). O import é tolerante para que main.py
+# funcione tanto com `uvicorn main:app` (dentro de backend/) quanto executado a
+# partir da raiz do repositório.
+try:
+    from auth import (
+        AuthenticatedUser,
+        AuthError,
+        burn_password_check,
+        decode_token,
+        extract_bearer_token,
+        hash_password,
+        has_persistent_secret,
+        is_legacy_sha256_hash,
+        issue_token,
+        user_from_payload,
+        verify_password,
+    )
+except ImportError:  # pragma: no cover
+    import sys
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from auth import (
+        AuthenticatedUser,
+        AuthError,
+        burn_password_check,
+        decode_token,
+        extract_bearer_token,
+        hash_password,
+        has_persistent_secret,
+        is_legacy_sha256_hash,
+        issue_token,
+        user_from_payload,
+        verify_password,
+    )
 
 # Provedor ativo e chaves
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek").lower()
@@ -33,7 +67,29 @@ else:
     print("[Yooga API] AVISO - DEEPSEEK_API_KEY nao configurada.")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY
+
+
+def require_service_role() -> None:
+    """
+    Garante que o backend está usando a service role key.
+
+    As tabelas relacionais (users/scenarios/simulations/...) têm RLS fechado para
+    `anon`/`authenticated`; só a service role (que ignora RLS) consegue lê-las.
+    Sem essa chave o login e o proxy /api/db/* não funcionariam — e degradar
+    silenciosamente para a anon key seria uma falha de segurança.
+    """
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Backend sem SUPABASE_SERVICE_ROLE_KEY configurada. "
+                "Defina a service role key no ambiente do backend (Render)."
+            ),
+        )
+
 
 def supabase_request(table: str, method: str = "GET", body: Any = None, params: Optional[Dict[str, str]] = None) -> Any:
     """Executa uma requisição REST direta à API PostgREST do Supabase (independente de SDK)."""
@@ -130,7 +186,7 @@ app.add_middleware(
 
 # Rate limiting simples em memória (req/min por IP)
 _rate_limit_store: Dict[str, List[float]] = defaultdict(list)
-RATE_LIMIT_MAX = 60
+RATE_LIMIT_MAX = 240
 RATE_LIMIT_WINDOW = 60  # segundos
 
 if GEMINI_API_KEY:
@@ -143,6 +199,22 @@ if BACKEND_API_KEY:
     print("[Yooga API] OK - Autenticacao de API habilitada (X-API-Key).")
 else:
     print("[Yooga API] AVISO - BACKEND_API_KEY nao configurada. API aberta (apenas dev local).")
+
+if SUPABASE_SERVICE_ROLE_KEY:
+    print("[Yooga Supabase] OK - Service role key configurada (acesso ao banco via RLS bypass).")
+else:
+    print(
+        "[Yooga Supabase] CRITICO - SUPABASE_SERVICE_ROLE_KEY nao configurada. "
+        "O login e as rotas /api/db/* retornaram 503 ate a chave ser definida."
+    )
+
+if has_persistent_secret():
+    print("[Yooga Auth] OK - AUTH_JWT_SECRET configurada.")
+else:
+    print(
+        "[Yooga Auth] AVISO - AUTH_JWT_SECRET nao configurada. Os tokens JWT serao "
+        "invalidados a cada reinicio do backend (aceitavel so em desenvolvimento)."
+    )
 
 # Caminho para os embeddings do FAQ
 FAQ_PATH = os.path.join(os.path.dirname(__file__), "..", "src", "data", "faq-embeddings.json")
@@ -1327,15 +1399,149 @@ def get_dynamic_offline_audit(history: List[Message], goals: List[str]) -> Dict[
     }
 # ─── Endpoints de Banco de Dados Centralizado (Proxy Supabase) ───────────────
 
+# Whitelist de entidades expostas pelo proxy (qualquer outra é rejeitada).
+ENTITY_TABLES: Dict[str, str] = {
+    "db_users": "users",
+    "db_scenarios": "scenarios",
+    "db_simulations": "simulations",
+    "db_company_profiles": "company_profiles",
+    "db_agent_performances": "agent_performances",
+}
+
+
 def get_table_name(entity_name: str) -> str:
-    mapping = {
-        "db_users": "users",
-        "db_scenarios": "scenarios",
-        "db_simulations": "simulations",
-        "db_company_profiles": "company_profiles",
-        "db_agent_performances": "agent_performances"
-    }
-    return mapping.get(entity_name, entity_name)
+    return ENTITY_TABLES.get(entity_name, entity_name)
+
+
+# ─── Autorização do proxy /api/db/* ──────────────────────────────────────────
+#
+# O proxy usa a service role key (que ignora RLS), portanto TODA checagem de
+# acesso precisa acontecer aqui, no backend:
+#
+#   | Entidade              | Leitura                  | Escrita                    |
+#   |-----------------------|--------------------------|----------------------------|
+#   | db_users              | somente admin            | somente admin              |
+#   | db_scenarios          | autenticado              | somente admin              |
+#   | db_company_profiles   | autenticado              | somente admin              |
+#   | db_simulations        | admin: tudo / agente: o próprio | agente: o próprio (delete: admin) |
+#   | db_agent_performances | admin: tudo / agente: o próprio | create: o próprio / update+delete: admin |
+
+# Entidades cujas linhas pertencem a um agente (o agente só enxerga as próprias).
+OWNER_SCOPED_ENTITIES = {"db_simulations", "db_agent_performances"}
+
+# Escrita restrita a administradores.
+ADMIN_ONLY_WRITE_ENTITIES = {"db_users", "db_scenarios", "db_company_profiles"}
+
+# Critérios PostgREST reservados — não podem ser fornecidos pelo cliente.
+RESERVED_CRITERIA_KEYS = {"or", "and", "not"}
+
+
+def current_user(request: Request) -> AuthenticatedUser:
+    """Extrai e valida o usuário autenticado a partir do header Authorization."""
+    token = extract_bearer_token(request.headers.get("authorization"))
+    if not token:
+        raise HTTPException(status_code=401, detail="Autenticação obrigatória. Faça login.")
+    try:
+        payload = decode_token(token)
+    except AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return user_from_payload(payload)
+
+
+def require_admin(user: AuthenticatedUser) -> None:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores.")
+
+
+def require_entity(entity: str) -> str:
+    table = ENTITY_TABLES.get(entity)
+    if not table:
+        raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
+    return table
+
+
+def assert_can_read(user: AuthenticatedUser, entity: str) -> None:
+    if entity == "db_users":
+        require_admin(user)
+
+
+def assert_can_write(user: AuthenticatedUser, entity: str, operation: str) -> None:
+    """Controla escrita por papel. `operation` ∈ create | update | delete."""
+    if entity in ADMIN_ONLY_WRITE_ENTITIES:
+        require_admin(user)
+    elif entity == "db_agent_performances":
+        if operation in ("update", "delete"):
+            require_admin(user)
+    elif entity == "db_simulations":
+        if operation == "delete":
+            require_admin(user)
+
+
+def owner_scope(user: AuthenticatedUser, entity: str) -> Dict[str, str]:
+    """
+    Filtro PostgREST que restringe um agente às próprias linhas.
+
+    Usa `or` para considerar tanto o agent_id (id do usuário) quanto o created_by
+    (e-mail), preservando registros antigos gravados antes do agent_id existir.
+    """
+    if user.is_admin or entity not in OWNER_SCOPED_ENTITIES:
+        return {}
+    return {"or": f"(agent_id.eq.{user.id},created_by.eq.{user.email})"}
+
+
+def assert_row_owned(user: AuthenticatedUser, entity: str, item_id: str) -> None:
+    """Garante que um agente só altera as próprias linhas (404 se não for dono)."""
+    if user.is_admin or entity not in OWNER_SCOPED_ENTITIES:
+        return
+
+    table = require_entity(entity)
+    rows = supabase_request(table, "GET", params={"id": f"eq.{item_id}"})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+
+    row = rows[0]
+    owned = row.get("agent_id") == user.id or str(row.get("created_by", "")).lower() == user.email.lower()
+    if not owned:
+        raise HTTPException(status_code=404, detail="Item não encontrado")
+
+
+def sanitize_user_payload(
+    data: Dict[str, Any], actor: AuthenticatedUser, for_create: bool
+) -> Dict[str, Any]:
+    """
+    Normaliza o payload de usuários.
+
+    A senha nunca é armazenada como texto puro: o backend aplica bcrypt. Para
+    compatibilidade com o frontend antigo (que enviava SHA-256), um hash legado
+    de 64 caracteres hex é aceito e convertido para bcrypt no primeiro login.
+    """
+    payload = dict(data)
+
+    email = str(payload.get("email", "")).strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="E-mail inválido.")
+    payload["email"] = email
+
+    if "role" in payload or for_create:
+        role = str(payload.get("role", "agent")).strip().lower()
+        if role not in ("admin", "agent"):
+            raise HTTPException(status_code=400, detail="Papel inválido. Use 'admin' ou 'agent'.")
+        payload["role"] = role
+
+    password = payload.get("password")
+    if password:
+        password = str(password)
+        if not is_legacy_sha256_hash(password):
+            payload["password"] = hash_password(password)
+
+    if for_create:
+        if not payload.get("password"):
+            raise HTTPException(status_code=400, detail="Senha obrigatória para novo usuário.")
+        payload["created_by"] = actor.email
+    else:
+        payload.pop("created_by", None)
+
+    return payload
 
 def map_db_to_js(entity: str, data: Any) -> Any:
     if not data:
@@ -1469,16 +1675,20 @@ def map_js_to_db(entity: str, data: Dict[str, Any]) -> Dict[str, Any]:
     return mapped
 
 @app.get("/api/db/{entity}")
-async def db_list(entity: str, orderBy: Optional[str] = "-created_date"):
+async def db_list(entity: str, request: Request, orderBy: Optional[str] = "-created_date"):
     try:
-        table = get_table_name(entity)
+        user = current_user(request)
+        table = require_entity(entity)
+        require_service_role()
+        assert_can_read(user, entity)
         desc = orderBy.startswith("-")
         field = orderBy.replace("-", "")
         if entity == "db_scenarios" and field == "moduleId":
             field = "module_id"
         order_direction = "desc" if desc else "asc"
-        
+
         params = {"order": f"{field}.{order_direction}"}
+        params.update(owner_scope(user, entity))
         res = supabase_request(table, "GET", params=params)
         return map_db_to_js(entity, res)
     except HTTPException as he:
@@ -1487,32 +1697,42 @@ async def db_list(entity: str, orderBy: Optional[str] = "-created_date"):
         raise HTTPException(status_code=500, detail=f"Erro no banco de dados: {e}")
 
 @app.post("/api/db/{entity}/filter")
-async def db_filter(entity: str, req: FilterRequest):
+async def db_filter(entity: str, req: FilterRequest, request: Request):
     try:
-        table = get_table_name(entity)
+        user = current_user(request)
+        table = require_entity(entity)
+        require_service_role()
+        assert_can_read(user, entity)
         desc = req.orderBy.startswith("-")
         field = req.orderBy.replace("-", "")
         if entity == "db_scenarios" and field == "moduleId":
             field = "module_id"
         order_direction = "desc" if desc else "asc"
-        
+
         params = {
             "order": f"{field}.{order_direction}",
             "limit": str(req.limit)
         }
-        
+
         # Mapeia critérios para filtros do PostgREST
         if req.criteria:
             for k, v in req.criteria.items():
                 db_key = k
                 if entity == "db_scenarios" and k == "moduleId":
                     db_key = "module_id"
-                    
+
+                if db_key.lower() in RESERVED_CRITERIA_KEYS:
+                    raise HTTPException(status_code=400, detail=f"Critério inválido: {k}")
+
                 if isinstance(v, str) and db_key == "created_by":
                     params[db_key] = f"ilike.{v}"
                 else:
                     params[db_key] = f"eq.{v}"
-                    
+
+        # O escopo de posse é aplicado DEPOIS dos critérios do cliente: um agente
+        # nunca consegueia ampliar o resultado para além das próprias linhas.
+        params.update(owner_scope(user, entity))
+
         res = supabase_request(table, "GET", params=params)
         return map_db_to_js(entity, res)
     except HTTPException as he:
@@ -1521,10 +1741,14 @@ async def db_filter(entity: str, req: FilterRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao filtrar banco de dados: {e}")
 
 @app.get("/api/db/{entity}/{item_id}")
-async def db_get(entity: str, item_id: str):
+async def db_get(entity: str, item_id: str, request: Request):
     try:
-        table = get_table_name(entity)
+        user = current_user(request)
+        table = require_entity(entity)
+        require_service_role()
+        assert_can_read(user, entity)
         params = {"id": f"eq.{item_id}"}
+        params.update(owner_scope(user, entity))
         res = supabase_request(table, "GET", params=params)
         if res and len(res) > 0:
             return map_db_to_js(entity, res[0])
@@ -1535,13 +1759,26 @@ async def db_get(entity: str, item_id: str):
         raise HTTPException(status_code=500, detail=f"Erro ao obter item: {e}")
 
 @app.post("/api/db/{entity}")
-async def db_create(entity: str, data: Dict[str, Any]):
+async def db_create(entity: str, data: Dict[str, Any], request: Request):
     try:
+        user = current_user(request)
+        table = require_entity(entity)
+        require_service_role()
+        assert_can_write(user, entity, "create")
         if not isinstance(data, dict) or not data:
             raise HTTPException(status_code=400, detail="Corpo da requisição deve ser um dicionário não-vazio")
-        table = get_table_name(entity)
-        if entity not in ("db_users", "db_scenarios", "db_simulations", "db_company_profiles", "db_agent_performances"):
-            raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
+
+        # Propriedades de posse NUNCA vêm do cliente: são derivadas do token.
+        data.pop("created_by", None)
+        data.pop("agent_id", None)
+        data.pop("agent_email", None)
+        if entity in OWNER_SCOPED_ENTITIES:
+            data["created_by"] = user.email
+            data["agent_id"] = user.id
+
+        if entity == "db_users":
+            data = sanitize_user_payload(data, user, for_create=True)
+
         db_data = map_js_to_db(entity, data)
         res = supabase_request(table, "POST", body=db_data)
         if res and len(res) > 0:
@@ -1553,16 +1790,29 @@ async def db_create(entity: str, data: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"Erro ao criar item: {e}")
 
 @app.put("/api/db/{entity}/{item_id}")
-async def db_update(entity: str, item_id: str, data: Dict[str, Any]):
+async def db_update(entity: str, item_id: str, data: Dict[str, Any], request: Request):
     try:
+        user = current_user(request)
+        table = require_entity(entity)
+        require_service_role()
+        assert_can_write(user, entity, "update")
         if not isinstance(data, dict) or not data:
             raise HTTPException(status_code=400, detail="Corpo da requisição deve ser um dicionário não-vazio")
-        if entity not in ("db_users", "db_scenarios", "db_simulations", "db_company_profiles", "db_agent_performances"):
-            raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
-        table = get_table_name(entity)
+
+        # Um agente só altera as próprias linhas.
+        assert_row_owned(user, entity, item_id)
+
         data.pop("created_date", None)
+        # Propriedades de posse não podem ser transferidas para outro usuário.
+        data.pop("created_by", None)
+        data.pop("agent_id", None)
+        data.pop("agent_email", None)
+
+        if entity == "db_users":
+            data = sanitize_user_payload(data, user, for_create=False)
+
         db_data = map_js_to_db(entity, data)
-        
+
         # updated_date pode ser atualizada via backend
         import datetime
         db_data["updated_date"] = datetime.datetime.utcnow().isoformat() + "Z"
@@ -1578,11 +1828,13 @@ async def db_update(entity: str, item_id: str, data: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"Erro ao atualizar item: {e}")
 
 @app.delete("/api/db/{entity}/{item_id}")
-async def db_delete(entity: str, item_id: str):
+async def db_delete(entity: str, item_id: str, request: Request):
     try:
-        if entity not in ("db_users", "db_scenarios", "db_simulations", "db_company_profiles", "db_agent_performances"):
-            raise HTTPException(status_code=400, detail=f"Entidade desconhecida: {entity}")
-        table = get_table_name(entity)
+        user = current_user(request)
+        table = require_entity(entity)
+        require_service_role()
+        assert_can_write(user, entity, "delete")
+        assert_row_owned(user, entity, item_id)
         params = {"id": f"eq.{item_id}"}
         supabase_request(table, "DELETE", params=params)
         return {"id": item_id, "deleted": True}
@@ -1595,34 +1847,74 @@ async def db_delete(entity: str, item_id: str):
 @app.post("/api/auth/login")
 async def auth_login(req: AuthLoginRequest):
     try:
+        require_service_role()
         table = get_table_name("db_users")
-        params = {"email": f"eq.{req.email.strip().lower()}"}
+        email = req.email.strip().lower()
+        params = {"email": f"eq.{email}"}
         users = supabase_request(table, "GET", params=params)
         if not users or len(users) == 0:
+            # Equaliza o tempo de resposta para não revelar quais e-mails existem.
+            burn_password_check(req.password)
             raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
 
         user = users[0]
-        hashed_input = hashlib.sha256(req.password.encode()).hexdigest()
         stored_hash = user.get("password", "")
-
-        is_match = stored_hash == hashed_input
-        if not is_match and stored_hash == req.password:
-            is_match = True
-            supabase_request(table, "PATCH", body={"password": hashed_input}, params={"id": f"eq.{user['id']}"})
+        is_match, needs_rehash = verify_password(req.password, stored_hash)
 
         if not is_match:
             raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
 
+        if needs_rehash:
+            # Upgrade automático do hash legado (SHA-256) para bcrypt.
+            supabase_request(
+                table,
+                "PATCH",
+                body={"password": hash_password(req.password)},
+                params={"id": f"eq.{user['id']}"},
+            )
+
+        authenticated = AuthenticatedUser(
+            id=user["id"],
+            email=user["email"],
+            full_name=user.get("full_name", ""),
+            role=user.get("role", "agent"),
+        )
+        token, expires_at = issue_token(authenticated)
+
         return {
-            "id": user["id"],
-            "full_name": user["full_name"],
-            "email": user["email"],
-            "role": user["role"]
+            **authenticated.to_public_dict(),
+            "token": token,
+            "expires_at": expires_at,
         }
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao autenticar: {e}")
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    """Perfil do usuário autenticado. O papel é sempre relido do banco."""
+    try:
+        require_service_role()
+        token_user = current_user(request)
+        table = get_table_name("db_users")
+        users = supabase_request(table, "GET", params={"id": f"eq.{token_user.id}"})
+        if not users:
+            raise HTTPException(status_code=401, detail="Sessão inválida. Faça login novamente.")
+
+        row = users[0]
+        fresh = AuthenticatedUser(
+            id=row["id"],
+            email=row["email"],
+            full_name=row.get("full_name", ""),
+            role=row.get("role", "agent"),
+        )
+        return fresh.to_public_dict()
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao validar sessão: {e}")
 
 
 if __name__ == "__main__":

@@ -134,13 +134,8 @@ export default function Login() {
               </Button>
               
               <div className="text-center text-xs text-slate-500">
-                <p>Desenvolvimento local (LocalStorage)</p>
-                <p className="mt-1">
-                  Admin Padrão: <span className="text-slate-400 font-mono">admin@yooga.com.br / admin123</span>
-                </p>
-                <p className="mt-0.5">
-                  Agente Padrão: <span className="text-slate-400 font-mono">mariana.silva@yooga.com.br / user123</span>
-                </p>
+                <p>Acesso restrito a usuários cadastrados.</p>
+                <p className="mt-1">Problemas com o acesso? Fale com o administrador da plataforma.</p>
               </div>
             </CardFooter>
           </form>

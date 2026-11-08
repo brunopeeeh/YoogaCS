@@ -20,7 +20,7 @@ export default function ManageUsers() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("agent");
-  const [password, setPassword] = useState("user123");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadUsersAndStats = async () => {
@@ -192,19 +192,24 @@ export default function ManageUsers() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-slate-700">Senha Provisória</Label>
+                    <Label htmlFor="password" className="text-slate-700">Senha de Acesso</Label>
                     <div className="relative">
                       <Key className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                       <Input
                         id="password"
-                        type="text"
-                        placeholder="Senha de acesso provisória"
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Defina uma senha de acesso"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
+                        minLength={8}
                         className="pl-9 rounded-xl border-slate-200 focus-visible:ring-primary"
                       />
                     </div>
+                    <p className="text-xs text-slate-500">
+                      A senha é gravada com hash bcrypt. Mínimo de 8 caracteres.
+                    </p>
                   </div>
 
                   <div className="space-y-2">

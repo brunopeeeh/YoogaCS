@@ -26,5 +26,7 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: AUTH_JWT_SECRET
+        sync: false
       - key: PYTHONIOENCODING
         value: utf-8

@@ -244,13 +244,32 @@ Siga o passo a passo para colocar a plataforma Yooga CS Coach em funcionamento n
 Certifique-se de possuir o **Node.js** (versão 18 ou superior) instalado em sua máquina.
 
 ### 2. Configuração de Variáveis de Ambiente
-Na raiz do projeto, você encontrará o arquivo `.env` para gerenciar a chave de IA. Certifique-se de que ele possui a estrutura abaixo preenchida:
+Na raiz do projeto, você encontrará o arquivo `.env` para gerenciar as chaves. **Nunca versione esse arquivo** (ele já está no `.gitignore`). Certifique-se de que ele possui a estrutura abaixo preenchida:
+
 ```env
-# Chave da API do Google Gemini (Obtenha gratuitamente em: https://aistudio.google.com/apikey)
+# Chave da API do Google Gemini (Obenha gratuitamente em: https://aistudio.google.com/apikey)
 VITE_GEMINI_API_KEY="SUA_CHAVE_API_AQUI"
+
+# ─── Frontend → Backend ────────────────────────────────────────────────────
+VITE_BACKEND_URL="http://localhost:8000"
+# Identificador do cliente (NÃO é autorização: vai no bundle do navegador).
+VITE_BACKEND_API_KEY="SUA_BACKEND_API_KEY"
+
+# ─── Backend (variáveis do processo Python, não prefixadas com VITE_) ──────
+SUPABASE_URL="https://SEU_PROJECT_REF.supabase.co"
+# Service role key: ignora RLS. Obrigatória para o login e para /api/db/*.
+SUPABASE_SERVICE_ROLE_KEY="SUA_SERVICE_ROLE_KEY"
+# Segredo de assinatura dos tokens JWT (mínimo de 32 caracteres, aleatório).
+AUTH_JWT_SECRET="GERE_UM_SEGREDO_LONGO_E_ALEATORIO"
 ```
 
-*Nota: Se a chave estiver ausente ou inválida, o sistema ativará automaticamente os fallbacks matemáticos e as respostas locais simuladas baseadas em RAG sem interromper o fluxo de navegação.*
+> **Por que a service role key é obrigatória no backend:** as tabelas relacionais
+> (`users`, `scenarios`, `simulations`, `company_profiles`, `agent_performances`)
+> têm RLS fechado para `anon`/`authenticated` — o acesso legítimo é feito pelo
+> backend, que aplica a autorização por papel. Sem a service role key o backend
+> responde `503` (falha explícita, nunca degrada para a anon key).
+
+*Nota: Se a chave do Gemini estiver ausente ou inválida, o sistema ativará automaticamente os fallbacks matemáticos e as respostas locais simuladas baseadas em RAG sem interromper o fluxo de navegação.*
 
 ### 3. Execução Local
 Navegue até o diretório do projeto e execute os comandos no terminal:
@@ -259,27 +278,122 @@ Navegue até o diretório do projeto e execute os comandos no terminal:
 # Instalar dependências de ponta do ecossistema React/Tailwind
 npm install
 
+# Instalar as dependências do backend (FastAPI)
+cd backend && python -m venv .venv && .venv/Scripts/pip install -r requirements.txt && cd ..
+
 # Iniciar o servidor de desenvolvimento ultraveloz do Vite
 npm run dev
 ```
 
 Abra o seu navegador no endereço retornado (geralmente [http://localhost:5173/](http://localhost:5173/)).
 
+O backend sobe separadamente:
+
+```bash
+cd backend
+.venv/Scripts/python -m uvicorn main:app --reload --port 8000
+```
+
+Testes do backend (autenticação e matriz de autorização):
+
+```bash
+backend/.venv/Scripts/python -m pytest backend/tests -q
+```
+
 ---
 
-## 🔑 CREDENCIAIS DE TESTE PADRÃO
+## 🔐 MODELO DE AUTENTICAÇÃO E AUTORIZAÇÃO
 
-Para validar os dois fluxos de experiência da plataforma (Agente e Administrador), utilize as credenciais pré-configuradas no banco reativo local:
+A autenticação é **exclusivamente do backend** (`backend/auth.py`):
 
-### 👨‍💼 Perfil do Administrador (Líder de CS)
-* **E-mail:** `bruno.oliveira@yooga.com.br` (ou `admin@yooga.com.br`)
-* **Senha:** `123456` (ou `admin123`)
-* **Permissões:** *Visualizar métricas agregadas da equipe inteira, auditar analistas individualmente, cadastrar novos cenários no simulador e exportar relatórios executivos em PDF.*
+* **Senhas** — gravadas com **bcrypt** (custo 12). O hash legado em SHA-256 ainda
+  pode ser *verificado* (para não travar quem já tem conta), mas é reescrito em
+  bcrypt no primeiro login bem-sucedido. **Senha em texto puro nunca é aceita.**
+* **Sessão** — o `POST /api/auth/login` devolve um **JWT HS256** (8h de validade)
+  assinado com `AUTH_JWT_SECRET`. O frontend o envia em `Authorization: Bearer`.
+* **`GET /api/auth/me`** — revalida a sessão e devolve o papel atual do usuário
+  (sempre relido do banco, nunca do token do cliente).
 
-### 🧑‍💻 Perfil do Agente (Analista de Atendimento)
-* **E-mail:** `mariana.silva@yooga.com.br` (ou `pedro.oliveira@yooga.com.br`)
-* **Senha:** `user123`
-* **Permissões:** *Estudar os artigos técnicos do FAQ, realizar Quizzes de teste, obter Badges e Certificações, treinar interativamente com clientes virtuais, solicitar auxílio pedagógico ao Coach de IA e consultar feedbacks da auditoria pós-chat.*
+### Matriz de acesso do proxy `/api/db/*`
+
+| Entidade | Leitura | Escrita |
+|---|---|---|
+| `db_users` | somente admin | somente admin |
+| `db_scenarios` | autenticado | somente admin |
+| `db_company_profiles` | autenticado | somente admin |
+| `db_simulations` | admin: tudo · agente: só as próprias | agente: só as próprias (delete: admin) |
+| `db_agent_performances` | admin: tudo · agente: só a própria | create: o próprio · update/delete: admin |
+
+A posse (`created_by` / `agent_id`) é **sempre derivada do token**, nunca do
+corpo da requisição — um agente não consegue se atribuir linhas de outro.
+
+### Fallback offline
+
+O fallback para `localStorage` continua existindo para o conteúdo que é local
+por natureza (módulos, artigos, quizzes). Erros de **autorização (401/403)** e de
+**misconfiguração (503)** nunca caem no fallback: degradar nesses casos
+esconderia a falta de permissão.
+
+---
+
+## 🛡️ SEGURANÇA E MIGRATIONS DO BANCO
+
+O banco do projeto está em `supabase/migrations/`. As migrations de segurança:
+
+| Migration | O que faz |
+|---|---|
+| `20260526120000_lockdown_rls_policies.sql` | Remove as policies `Allow all operations` (escalada de privilégio), revoga o acesso de `anon`/`authenticated` às tabelas relacionais, mantém leitura pública da base de conhecimento e converte os hashes SHA-256 legados para bcrypt. |
+| `20260526130000_schema_hygiene.sql` | Move a extensão `vector` para o schema `extensions`, tira o event trigger de RLS do schema `public` e converte as funções de leitura para `SECURITY INVOKER`. |
+
+O acesso às tabelas relacionais é feito **apenas pelo backend** com a service role
+key (que ignora RLS). Nenhum segredo deve ficar no repositório: use
+`.mcp.json.example` como modelo e mantenha `.mcp.json` fora do git.
+
+### Rotação de credenciais (obrigatório)
+
+As senhas que aparecem no histórico do repositório são consideradas
+comprometidas. Após aplicar as migrations, **troque a senha dos 4 usuários**:
+
+```sql
+-- no SQL Editor do Supabase (a nova senha é gerada e devolvida em texto puro
+-- apenas nesta consulta; envie-a ao usuário por canal seguro)
+update public.users
+set password = extensions.crypt('NOVA_SENHA_FORTE', extensions.gen_salt('bf', 12))
+where email = 'admin@yooga.com.br';
+```
+
+Repita para os demais e-mails e comunique as novas senhas por canal privado.
+Também **rotacione a service role key** no dashboard do Supabase
+(*Project Settings → API Keys*) e atualize a variável `SUPABASE_SERVICE_ROLE_KEY`
+no Render.
+
+### Histórico de migrations
+
+O banco remoto foi montado manualmente e **não possui histórico de migrations**
+(o `supabase_migrations` está vazio), enquanto o repositório tem as migrations
+versionadas. Depois de aplicar as migrations de segurança, registre o histórico
+para que o `supabase db push` não tente reaplicar o que já existe:
+
+```bash
+supabase migration repair --status applied 20260523120000
+supabase migration repair --status applied 20260525130000
+supabase migration repair --status applied 20260526120000
+supabase migration repair --status applied 20260526130000
+```
+
+---
+
+## 🔑 CREDENCIAIS DE TESTE
+
+> ⚠️ **As credenciais abaixo foram publicadas no repositório e não são mais
+> válidas como segredo.** Elas existem apenas como referência do histórico e
+> devem ser **trocadas** assim que a migration de segurança for aplicada
+> (veja *Rotação de credenciais*). Nunca reintroduza senhas padrão no código.
+
+| Perfil | E-mail | Permissões |
+|---|---|---|
+| 👨‍💼 Administrador (Líder de CS) | `admin@yooga.com.br`, `bruno.oliveira@yooga.com.br` | *Visualizar métricas agregadas da equipe inteira, auditar analistas individualmente, cadastrar novos cenários no simulador, gerenciar usuários e exportar relatórios executivos em PDF.* |
+| 🧑‍💻 Agente (Analista de Atendimento) | `mariana.silva@yooga.com.br`, `pedro.oliveira@yooga.com.br` | *Estudar os artigos técnicos do FAQ, realizar Quizzes de teste, obter Badges e Certificações, treinar interativamente com clientes virtuais, solicitar auxílio pedagógico ao Coach de IA e consultar feedbacks da auditoria pós-chat.* |
 
 ---
 

@@ -51,10 +51,20 @@ async function getOrCreateScenario(scenarioData) {
     console.warn(`[Yooga Seed] Erro ao listar cenários para verificar unicidade de "${scenarioData.title}":`, err.message);
   }
   
-  return await Scenario.create({
-    ...scenarioData,
-    skipSyncQueue: true
-  });
+  try {
+    return await Scenario.create({
+      ...scenarioData,
+      skipSyncQueue: true
+    });
+  } catch (err) {
+    if (err?.status === 401 || err?.status === 403) {
+      // Apenas administradores podem criar cenários — o seed é silencioso
+      // para agentes, que apenas consomem os cenários já cadastrados.
+      console.warn(`[Yooga Seed] Cenário "${scenarioData.title}" não criado: sem permissão.`);
+      return null;
+    }
+    throw err;
+  }
 }
 
 async function initializeKnowledgeDatabase() {
