@@ -369,17 +369,26 @@ no Render.
 
 ### Histórico de migrations
 
-O banco remoto foi montado manualmente e **não possui histórico de migrations**
-(o `supabase_migrations` está vazio), enquanto o repositório tem as migrations
-versionadas. Depois de aplicar as migrations de segurança, registre o histórico
-para que o `supabase db push` não tente reaplicar o que já existe:
+O banco remoto foi montado manualmente e **não possuía histórico de migrations**
+(o `supabase_migrations` estava vazio), enquanto o repositório tem as migrations
+versionadas. O histórico foi reconciliado — as 4 migrations do repositório
+correspondem exatamente às versões registradas no banco:
 
-```bash
-supabase migration repair --status applied 20260523120000
-supabase migration repair --status applied 20260525130000
-supabase migration repair --status applied 20260526120000
-supabase migration repair --status applied 20260526130000
-```
+| Versão | Migration |
+|---|---|
+| `20260523120000` | `create_knowledge_vector_store` |
+| `20260525130000` | `create_relational_tables` |
+| `20260526120000` | `lockdown_rls_policies` |
+| `20260526130000` | `schema_hygiene` |
+
+Assim, `supabase db push` não tentará reaplicar nada. **Ao criar uma migration
+nova, use `supabase migration new <nome>`** para que o prefixo de versão gerado
+case com o registro no banco.
+
+> ⚠️ A migration `20260525130000` ainda contém, no texto, as policies
+> `Allow all operations` — é o registro histórico do que foi aplicado. Elas
+> **não estão ativas**: a migration `20260526120000` as removeu. Não edite
+> migrations já aplicadas; crie uma nova.
 
 ---
 
