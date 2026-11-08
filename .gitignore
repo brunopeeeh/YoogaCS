@@ -44,3 +44,7 @@ test-results/
 
 # Contexto IA local (não versionar — diretrizes internas de simulação)
 src/data/knowledge-base/_system/
+
+# Credenciais de MCP / Supabase (nunca versionar)
+.mcp.json
+.agent/mcp_config.json
